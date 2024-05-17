@@ -1,8 +1,15 @@
 {
-  "name": "tol",
-  "displayName": "TOL",
-  "description": "TOL Tools for VSCode",
+  "name": "tol-tools",
+  "displayName": "TOL Tools",
+  "description": "Development tools for VSCode",
   "version": "0.0.1",
+  "publisher": "TOL",
+  "icon": "logo.png",
+  "repository": {
+    "url": "https://github.com/territorium/vscode.git",
+    "type": "git"
+  },
+  "license": "MIT",
   "engines": {
     "vscode": "^1.89.0"
   },
@@ -15,7 +22,7 @@
     "commands": [
       {
         "command": "tol.helloWorld",
-        "title": "Hello World"
+        "title": "Hello TOL!"
       }
     ]
   },
