@@ -6,46 +6,38 @@ import * as path from "path";
 import * as fs from "fs";
 import * as fse from "fs-extra";
 
-import { isEmpty } from "lodash";
-
 // tslint:disable-next-line:no-require-imports
 import { MessageItem } from "vscode";
 
 import { DialogMessage } from '../util/DialogMessage';
 
 import { ServerModel } from "./ServerModel";
-import { ServerTreeItem } from "./ServerTreeProvider";
-import { Server, ServerOQL, ServerPlatform, IS_WINDOWS } from "./Server";
-
-import { Workspace } from "../util/Workspace";
-import { ProcessBuilder } from "../util/ProcessBuilder";
-import { ServerTreeModel } from "./ServerTreeModel";
+import { Server } from "./Server";
 
 
 export class ServerController {
 
     private _outputChannel: vscode.OutputChannel;
 
-    constructor(private _model: ServerModel) {
+    constructor(private _model: ServerModel, private _context: vscode.ExtensionContext) {
         this._outputChannel = vscode.window.createOutputChannel('vscode-tol');
     }
 
     async validateInstallPath(installPath: string): Promise<boolean> {
-        const configFileExists: Promise<boolean> = fse.pathExists(path.join(installPath, 'conf', 'server.properties'));
-        const loggingFileExists: Promise<boolean> = fse.pathExists(path.join(installPath, 'conf', 'logging.properties'));
-        const odbConfigFileExists: Promise<boolean> = fse.pathExists(path.join(installPath, 'bin', 'odb-server.properties'));
-        const odbLoggingFileExists: Promise<boolean> = fse.pathExists(path.join(installPath, 'bin', 'odb-logging.properties'));
-
-        return await configFileExists && await loggingFileExists || (await odbConfigFileExists && await odbLoggingFileExists);
+        const configFileExists = await fse.pathExists(path.join(installPath, 'conf', 'server.properties'));
+        const loggingFileExists = await fse.pathExists(path.join(installPath, 'conf', 'logging.properties'));
+        const odbConfigFileExists = await fse.pathExists(path.join(installPath, 'bin', 'odb-server.properties'));
+        const odbLoggingFileExists = await fse.pathExists(path.join(installPath, 'bin', 'odb-logging.properties'));
+        return (configFileExists && loggingFileExists) || (odbConfigFileExists && odbLoggingFileExists);
     }
 
     public async addServer(): Promise<void> {
-        const pathPicker: vscode.Uri[] | undefined = await vscode.window.showOpenDialog({
-            defaultUri: vscode.workspace.rootPath ? vscode.Uri.file(vscode.workspace.rootPath) : undefined,
+        const pathPicker = await vscode.window.showOpenDialog({
             canSelectFiles: false,
             canSelectFolders: true,
             openLabel: DialogMessage.selectDirectory,
             title: "Select Installation Directory"
+            // defaultUri: vscode.workspace.rootPath ? vscode.Uri.file(vscode.workspace.rootPath) : undefined
         });
 
         if (pathPicker) {
@@ -56,24 +48,12 @@ export class ServerController {
                     return;
                 }
 
-                const existingServerNames: string[] = this._model.getServerList().map((item: Server) => { return item.getName(); });
-                const serverName: string = await Workspace.getServerName(installPath, this._model.defaultStoragePath, existingServerNames);
-                const storagePath: string = await Workspace.getStoragePath(this._model.defaultStoragePath, serverName);
-                fse.remove(storagePath);
-
-                if (await fse.pathExists(path.join(installPath, "bin", "smartIO" + (IS_WINDOWS ? '.exe' : '')))) {
-                    this._model.addServer(new ServerPlatform(serverName + " Platform", installPath, storagePath));
-                }
-
-                if (await fse.pathExists(path.join(installPath, "bin", "smartIO-odb" + (IS_WINDOWS ? '.exe' : '')))) {
-                    this._model.addServer(new ServerOQL(serverName + " Server", installPath, storagePath));
-                }
+                this._model.addServerPath(installPath);
             };
         }
     }
 
-    public async deleteServer(item: ServerTreeItem): Promise<void> {
-        const server: Server | null = await this.precheck(item.getServer());
+    public async deleteServer(server: Server): Promise<void> {
         if (server) {
             const confirmation: MessageItem | undefined = await vscode.window.showWarningMessage(DialogMessage.deleteConfirm, DialogMessage.yes, DialogMessage.cancel);
             if (confirmation !== DialogMessage.yes) {
@@ -86,8 +66,8 @@ export class ServerController {
         }
     }
 
-    public async selectModel(item: ServerTreeModel): Promise<void> {
-        if (item) {
+    public async selectModel(server: Server): Promise<void> {
+        if (server) {
             const pathPicker: vscode.Uri[] | undefined = await vscode.window.showOpenDialog({
                 defaultUri: vscode.workspace.rootPath ? vscode.Uri.file(vscode.workspace.rootPath) : undefined,
                 canSelectFiles: true,
@@ -99,119 +79,93 @@ export class ServerController {
             });
 
             if (pathPicker) {
-                const location = path.parse(pathPicker[0].fsPath).dir;
-                item.getServer().setModel(location);
-                vscode.commands.executeCommand('tol.refreshServerView');
+                this._model.setModelPath(server, path.parse(pathPicker[0].fsPath).dir);
             }
         }
     }
 
-    public async stopOrRestartServer(item: Server, restart: boolean = false): Promise<void> {
-        const server: Server | null = await this.precheck(item);
+    public async startServer(server: Server, debug?: boolean): Promise<void> {
+        if (server) {
+            if (server.isStarted()) {
+                vscode.window.showInformationMessage(DialogMessage.serverRunning);
+                return;
+            }
+
+            server.setDebugPort(debug ? 8004 : -1),
+                await this.startInternally(server);
+        }
+    }
+
+    public async stopOrRestartServer(server: Server, restart: boolean = false): Promise<void> {
         if (server) {
             if (!server.isStarted()) {
                 vscode.window.showInformationMessage(DialogMessage.serverStopped);
                 return;
             }
 
-            server.needRestart = restart;
-            await ProcessBuilder.execute(this._outputChannel, server.getName(), server.getCommand(), { shell: true }, ...server.getArguments('stop'));
-        }
-    }
+            await server.stop(this._outputChannel);
 
-    public async startServer(server: ServerTreeItem, debug?: boolean): Promise<void> {
-        if (server) {
-            if (server.getServer().isStarted()) {
-                vscode.window.showInformationMessage(DialogMessage.serverRunning);
-                return;
-            }
-            if (debug) {
-            }
-            server.getServer().setDebugPort(debug ? 8004 : -1),
-
+            if (restart) {
                 await this.startInternally(server);
+            }
         }
     }
 
-    public async openApplication(item: ServerTreeItem): Promise<void> {
-        if (item) {
-            if (!item.getServer().isStarted()) {
+    public async openExternal(server: Server, resource: string): Promise<void> {
+        if (server) {
+            if (!server.isStarted()) {
                 const result: MessageItem | undefined = await vscode.window.showInformationMessage(DialogMessage.startServer, DialogMessage.yes, DialogMessage.cancel);
                 if (result !== DialogMessage.yes) {
                     return;
                 }
-                this.startServer(item);
+                this.startServer(server);
             }
             // const httpPort: string = await Utility.getPort(item.getServerConfigPath(), Constants.PortKind.Http);
             // vscode.env.openExternal(vscode.Uri.parse(`${Constants.LOCALHOST}:${httpPort}`));
-            vscode.env.openExternal(vscode.Uri.parse("http://localhost:8080/smartio/fm"));
+            vscode.env.openExternal(vscode.Uri.parse(resource));
         }
     }
 
-    public async openAdminPanel(item: ServerTreeItem): Promise<void> {
-        if (item) {
-            if (!item.getServer().isStarted()) {
-                const result: MessageItem | undefined = await vscode.window.showInformationMessage(DialogMessage.startServer, DialogMessage.yes, DialogMessage.cancel);
-                if (result !== DialogMessage.yes) {
-                    return;
-                }
-                this.startServer(item);
-            }
-            // const httpPort: string = await Utility.getPort(item.getServerConfigPath(), Constants.PortKind.Http);
-            // vscode.env.openExternal(vscode.Uri.parse(`${Constants.LOCALHOST}:${httpPort}`));
-            vscode.env.openExternal(vscode.Uri.parse("http://localhost:8088"));
-        }
-    }
-
-    private async startInternally(serverInfo: ServerTreeItem): Promise<void> {
-        const server: Server = serverInfo.getServer();
+    private async startInternally(server: Server): Promise<void> {
         const serverConfig: string = server.getConfigPath();
 
         let watcher = fs.watch(serverConfig);
         try {
-            // await this._model.updateJVMOptions(serverName);
-            // watcher.on('change', async () => {
-            //     if (serverPort !== await Utility.getPort(serverConfig, Constants.PortKind.Server)) {
-            //         const result: MessageItem = await vscode.window.showErrorMessage(
-            //             DialogMessage.getServerPortChangeErrorMessage(serverName, serverPort), DialogMessage.yes, DialogMessage.no, DialogMessage.moreInfo
-            //         );
+            watcher.on('change', async () => {
+                //     if (serverPort !== await Utility.getPort(serverConfig, Constants.PortKind.Server)) {
+                //         const result: MessageItem = await vscode.window.showErrorMessage(
+                //             DialogMessage.getServerPortChangeErrorMessage(serverName, serverPort), DialogMessage.yes, DialogMessage.no, DialogMessage.moreInfo
+                //         );
 
-            //         if (result === DialogMessage.yes) {
-            //             await Utility.setPort(serverConfig, Constants.PortKind.Server, serverPort);
-            //         } else if (result === DialogMessage.moreInfo) {
-            //             opn(Constants.UNABLE_SHUTDOWN_URL);
-            //         }
-            //     } else if (await Utility.needRestart(httpPort, httpsPort, serverConfig)) {
-            //         const item: MessageItem = await vscode.window.showWarningMessage(
-            //             DialogMessage.getConfigChangedMessage(serverName), DialogMessage.yes, DialogMessage.no, DialogMessage.never
-            //         );
+                //         if (result === DialogMessage.yes) {
+                //             await Utility.setPort(serverConfig, Constants.PortKind.Server, serverPort);
+                //         } else if (result === DialogMessage.moreInfo) {
+                //             opn(Constants.UNABLE_SHUTDOWN_URL);
+                //         }
+                //     } else if (await Utility.needRestart(httpPort, httpsPort, serverConfig)) {
+                //         const item: MessageItem = await vscode.window.showWarningMessage(
+                //             DialogMessage.getConfigChangedMessage(serverName), DialogMessage.yes, DialogMessage.no, DialogMessage.never
+                //         );
 
-            //         if (item === DialogMessage.yes) {
-            //             await this.stopOrRestartServer(serverInfo, true);
-            //         } else if (item === DialogMessage.never) {
-            //             Utility.disableAutoRestart();
-            //         }
-            //     }
-            // });
+                //         if (item === DialogMessage.yes) {
+                //             await this.stopOrRestartServer(serverInfo, true);
+                //         } else if (item === DialogMessage.never) {
+                //             Utility.disableAutoRestart();
+                //         }
+                //     }
+            });
 
-            let startArguments: string[] = server.getArguments('start');
-
-            const process: Promise<void> = ProcessBuilder.execute(this._outputChannel, server.getName(), server.getCommand(), { shell: true }, ...startArguments);
+            const process = server.start(this._outputChannel);
             server.setStarted(true);
             this.startDebugSession(server);
             await process;
-            server.setStarted(false);
-            watcher.close();
-            if (server.needRestart) {
-                server.needRestart = false;
-                await this.startInternally(serverInfo);
-            }
         } catch (err: any) {
+            vscode.window.showErrorMessage(err.toString());
+        } finally {
             server.setStarted(false);
-            if (watcher) { 
+            if (watcher) {
                 watcher.close();
             }
-            vscode.window.showErrorMessage(err.toString());
         }
     }
 
@@ -226,21 +180,13 @@ export class ServerController {
             });
         }
 
-        if (!server || !server.isDebugging() || !workspaceFolder) {
+        if (!server.isDebugging() || !workspaceFolder) {
             return;
         }
         const config = server.getDebugConfiguration();
         if (config) {
             setTimeout(() => vscode.debug.startDebugging(workspaceFolder, config), 500);
         }
-    }
-
-    private async precheck(item: Server): Promise<Server | null> {
-        if (isEmpty(this._model.getServerList())) {
-            vscode.window.showInformationMessage(DialogMessage.noServer);
-            return null;
-        }
-        return item;
     }
 
     public dispose(): void {

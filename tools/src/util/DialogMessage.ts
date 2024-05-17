@@ -7,7 +7,7 @@ export namespace DialogMessage {
     export const no: MessageItem = { title: 'No', isCloseAffordance: true };
     export const cancel: MessageItem = { title: 'Cancel', isCloseAffordance: true };
     export const never: MessageItem = { title: 'Never' };
-    export const moreInfo: MessageItem = { title: 'More Info'};
+    export const moreInfo: MessageItem = { title: 'More Info' };
     export const selectServer: string = 'Select Server';
     export const addServer: string = 'Add New Server';
     export const noServer: string = 'There are no Servers.';

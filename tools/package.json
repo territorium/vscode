@@ -2,7 +2,7 @@
   "name": "tol-tools",
   "displayName": "TOL Tools",
   "description": "Development tools for VSCode",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "publisher": "TOL",
   "icon": "logo.png",
   "repository": {
@@ -262,6 +262,16 @@
       {
         "title": "smart.IO Configuration",
         "properties": {
+          "smartio.chrome": {
+            "type": "string",
+            "default": "/opt/google/chrome/chrome",
+            "description": "Chrome location"
+          },
+          "smartio.chromePort": {
+            "type": "integer",
+            "default": 9222,
+            "description": "Chrome debugger port"
+          },
           "smartio.workspace": {
             "type": "string",
             "default": "",

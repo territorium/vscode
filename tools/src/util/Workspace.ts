@@ -1,8 +1,8 @@
 'use strict';
 
+import * as vscode from "vscode";
 import * as path from "path";
 import * as fse from "fs-extra";
-import * as vscode from "vscode";
 
 const RESTART_CONFIG_ID: string = 'restart_when_http(s)_port_change';
 

@@ -59,9 +59,18 @@ export class ModelTreeItem extends ProjectNode {
 
     public async getChildren(): Promise<ProjectNode[]> {
         try {
-            const children: ProjectNode[] = [];
+            const files: fs.Dirent[] = [];
             const dir = await opendir(this.path);
-            for await (const e of dir) { children.push(new FileTreeItem(e.path)); }
+            for await (const e of dir) { files.push(e); }
+
+            files.sort((f1, f2) => {
+                if (f1.isDirectory() && f2.isFile()) { return -1; }
+                if (f2.isDirectory() && f1.isFile()) { return 1; }
+                return f1.path.localeCompare(f2.path);
+            });
+
+            const children: ProjectNode[] = [];
+            files.forEach(f => children.push(new FileTreeItem(f.path)));
             return children;
         } catch (err) {
             console.error(err);

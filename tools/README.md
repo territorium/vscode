@@ -2,7 +2,7 @@
 
 ## Usage
 
-![start and run](images/smartio.gif)
+![screencast](screencast.png))
 
 ## Features
 * Add smart.IO Platform from Install Path

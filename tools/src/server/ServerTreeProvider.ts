@@ -2,25 +2,18 @@
 
 import * as vscode from "vscode";
 import * as path from "path";
-import * as fse from "fs-extra";
 
 import { TreeItem } from "vscode";
 
 import { Utility } from "../util/Utility";
-import { Server, ServerState } from "./Server";
 import { ServerModel } from "./ServerModel";
-import { ServerTreeModel } from "./ServerTreeModel";
-import { ServerTreeFile } from "./ServerTreeFile";
+import { Server, ServerState } from "./Server";
 
 
 export class ServerTreeItem extends vscode.TreeItem {
 
-    constructor(private server: Server, label: string, icon: string, context: vscode.ExtensionContext) {
-        super(label);
-        this.iconPath = {
-            dark: vscode.Uri.parse(context.asAbsolutePath(path.join('icons', 'dark', icon))),
-            light: vscode.Uri.parse(context.asAbsolutePath(path.join('icons', 'light', icon)))
-        };
+    constructor(private server: Server) {
+        super(server.getName());
     }
 
     public getServer(): Server {
@@ -59,58 +52,81 @@ export class ServerTreeProvider implements vscode.TreeDataProvider<TreeItem> {
     public async getChildren(element?: TreeItem): Promise<TreeItem[]> {
         if (!element) {
             return this._model.getServerList().map((server: Server) => {
-                const item = new ServerTreeItem(server, server.getName(), `${server.getIcon()}.svg`, this._context);
+                const item = new ServerTreeItem(server);
                 item.contextValue = server.getState();
+                item.iconPath = this.resolveIcon(`${server.getIcon()}.svg`);
                 item.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
                 return item;
             });
-        } else if (element.contextValue === ServerState.IdleServer || element.contextValue === ServerState.RunningServer) {
-            const server: ServerTreeItem = <ServerTreeItem>element;
-
-            const webapps: string = path.join(server.getServer().getStoragePath(), 'webapps');
-            if (await fse.pathExists(webapps)) {
-                const wars: string[] = [];
-                let temp: fse.Stats;
-                let fileExtension: string;
-                // show war packages with no extension if there is one
-                // and no need to show war packages if its unzipped folder exists
-                const promises: Promise<void>[] = (await fse.readdir(webapps)).map(async (w: string) => {
-                    if (w.toUpperCase() !== 'ROOT') {
-                        temp = await fse.stat(path.join(webapps, w));
-                        fileExtension = path.extname(path.join(webapps, w));
-                        if (temp.isDirectory() || (temp.isFile() && fileExtension === '.war')) {
-                            wars.push(fileExtension === '.war' ? path.basename(w, fileExtension) : w);
-                        }
-                    }
-                });
-                await Promise.all(promises);
-                // tslint:disable-next-line:underscore-consistent-invocation
-                return [];
-            }
-
-            return server.getServer().getChildren(this._context);
-        } else if (element.contextValue === "model") {
-            const model: ServerTreeModel = <ServerTreeModel>element;
-
-            return model.getServer().getModelChildren(this._context);
         }
-        return [];
+
+        const children: TreeItem[] = [];
+        switch (element.contextValue) {
+            case "model": const model = <ServerTreeItem>element;
+                const location = model.getServer().modelLocation;
+                if (location) {
+                    let node = new TreeItem(vscode.Uri.parse(path.join(location, 'server.properties')));
+                    node.label = "Server configuration";
+                    node.contextValue = "toml";
+                    node.iconPath = this.resolveIcon('settings-gear.svg');
+                    children.push(node);
+
+                    node = new TreeItem(vscode.Uri.parse(path.join(location, 'context.properties')));
+                    node.label = "Context configuration";
+                    node.contextValue = "toml";
+                    node.iconPath = this.resolveIcon('settings-gear.svg');
+                    children.push(node);
+                }
+                break;
+
+            case ServerState.IdleServer:
+            case ServerState.RunningServer:
+                const server: Server = (<ServerTreeItem>element).getServer();
+                server.getFiles().forEach(i => {
+                    const node = new TreeItem(vscode.Uri.parse(i[1]));
+                    node.label = path.basename(i[0]);
+                    node.contextValue = "toml";
+                    node.iconPath = this.resolveIcon('settings-gear.svg');
+
+                    if (i[1].endsWith("jvm.options")) {
+                        node.contextValue = "jvm";
+                        node.iconPath = this.resolveIcon('settings.svg');
+                    }
+
+                    children.push(node);
+                });
+
+                if (server.getType() === "platform") {
+                    const node = new ServerTreeItem(server);
+                    node.label = server.modelLocation ? path.basename(server.modelLocation) : "<Select Model>";
+                    node.contextValue = "model";
+                    node.iconPath = this.resolveIcon('archive.svg');
+                    node.collapsibleState = server.modelLocation ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None;
+                    children.push(node);
+                }
+                break;
+        }
+        return children;
     }
 
-    public onClicked(item: ServerTreeFile) {
-        if (item.filename === undefined) {
+    public onClicked(item: TreeItem) {
+        if (item.resourceUri === undefined) {
             return;
         }
 
-        if (!fse.pathExists(item.filename)) {
-            const server = item.getServer();
-            fse.copy(path.join(this._context.extensionPath, 'resources', 'jvm.options'), path.join(server.getStoragePath(), 'jvm.options'));
+        if (item.contextValue === "jvm" || item.contextValue === "toml") {
+            Utility.openFile(item.resourceUri.fsPath);
         }
-
-        Utility.openFile(item.filename);
     }
 
     public dispose(): void {
         this._onDidChangeTreeData.dispose();
+    }
+
+    private resolveIcon(name: string): { dark: vscode.Uri; light: vscode.Uri; } {
+        return {
+            dark: vscode.Uri.parse(this._context.asAbsolutePath(path.join('icons', 'dark', name))),
+            light: vscode.Uri.parse(this._context.asAbsolutePath(path.join('icons', 'light', name)))
+        };
     }
 }

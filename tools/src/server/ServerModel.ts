@@ -1,12 +1,12 @@
 'use strict';
 
-import * as path from "path";
 import * as vscode from "vscode";
-
-import { Server, ServerPlatform, ServerOQL, DEBUG_SESSION_NAME } from "./Server";
-
+import * as path from "path";
 import * as fse from "fs-extra";
-import * as dash from "lodash";
+
+import { Workspace } from "../util/Workspace";
+import { Server, ServerPlatform, ServerOQL, IS_WINDOWS, DEBUG_SESSION_NAME } from "./Server";
+
 
 class ModelConfig {
 
@@ -17,14 +17,14 @@ class ModelConfig {
 
 export class ServerModel {
 
-    private _serverList: Server[] = [];
+    private _config: string;
+    private _serverList: Server[];
 
-    private _serverConfig: string;
+    constructor(public defaultStoragePath: string, private context: vscode.ExtensionContext) {
+        this._config = path.join(defaultStoragePath, 'servers.json');
+        this._serverList = [];
 
-    constructor(public defaultStoragePath: string, context: vscode.ExtensionContext) {
-        this._serverConfig = path.join(defaultStoragePath, 'servers.json');
-
-        this.initServerListSync(context);
+        this.loadServerList(context);
 
         vscode.debug.onDidTerminateDebugSession((session: vscode.DebugSession) => {
             if (session && session.name && session.name.startsWith(DEBUG_SESSION_NAME)) {
@@ -37,6 +37,12 @@ export class ServerModel {
         return this._serverList;
     }
 
+    public setModelPath(server: Server, location: string) {
+        (<ServerPlatform>server).setModel(location);
+        this.saveServerListSync();
+        vscode.commands.executeCommand('tol.refreshServerView');
+    }
+
     public getServerByName(serverName: string): Server | undefined {
         return this._serverList.find((item: Server) => item.getName() === serverName);
     }
@@ -44,8 +50,8 @@ export class ServerModel {
     public deleteServer(server: Server): boolean {
         const index: number = this._serverList.findIndex((item: Server) => item.getName() === server.getName());
         if (index > -1) {
-            const oldServer: Server[] = this._serverList.splice(index, 1);
-            if (!dash.isEmpty(oldServer)) {
+            const oldServer = this._serverList.splice(index, 1);
+            if (oldServer.length > 0) {
                 fse.remove(server.getStoragePath());
                 this.saveServerListSync();
 
@@ -55,6 +61,21 @@ export class ServerModel {
         }
 
         return false;
+    }
+
+    public async addServerPath(installPath: string): Promise<void> {
+        const existingServerNames: string[] = this.getServerList().map((item: Server) => { return item.getName(); });
+        const serverName: string = await Workspace.getServerName(installPath, this.defaultStoragePath, existingServerNames);
+        const storagePath: string = await Workspace.getStoragePath(this.defaultStoragePath, serverName);
+        fse.remove(storagePath);
+
+        if (await fse.pathExists(path.join(installPath, "bin", "smartIO" + (IS_WINDOWS ? '.exe' : '')))) {
+            this.addServer(new ServerPlatform(serverName + " Platform", installPath, storagePath, this.context));
+        }
+
+        if (await fse.pathExists(path.join(installPath, "bin", "smartIO-odb" + (IS_WINDOWS ? '.exe' : '')))) {
+            this.addServer(new ServerOQL(serverName + " Server", installPath, storagePath));
+        }
     }
 
     public addServer(server: Server): void {
@@ -68,30 +89,30 @@ export class ServerModel {
         vscode.commands.executeCommand('tol.refreshServerView');
     }
 
-    public saveServerListSync(): void {
+    private loadServerList(context: vscode.ExtensionContext): void {
         try {
-            fse.outputJsonSync(this._serverConfig, this._serverList.map((s: Server) => {
-                return new ModelConfig(s.getName(), s.getInstallPath(), s.getStoragePath(), s.getType(), s.modelLocation);
-            }));
-        } catch (err : any) {
-            console.error(err.toString());
-        }
-    }
-
-    private initServerListSync(context: vscode.ExtensionContext): void {
-        try {
-            if (fse.existsSync(this._serverConfig)) {
-                const objArray: ModelConfig[] = fse.readJsonSync(this._serverConfig);
-                if (!dash.isEmpty(objArray)) {
+            if (fse.existsSync(this._config)) {
+                const objArray: ModelConfig[] = fse.readJsonSync(this._config);
+                if (objArray.length > 0) {
                     this._serverList = this._serverList.concat(objArray.map(
                         obj => {
                             return (obj._type === "server") ? new ServerOQL(obj._name, obj._installPath, obj._storagePath)
-                                : new ServerPlatform(obj._name, obj._installPath, obj._storagePath, obj._model);
+                                : new ServerPlatform(obj._name, obj._installPath, obj._storagePath, context, obj._model);
                         }));
                 }
             }
         } catch (err) {
             console.error(err);
+        }
+    }
+
+    public saveServerListSync(): void {
+        try {
+            fse.outputJsonSync(this._config, this._serverList.map((s: Server) => {
+                return new ModelConfig(s.getName(), s.getInstallPath(), s.getStoragePath(), s.getType(), s.modelLocation);
+            }));
+        } catch (err: any) {
+            console.error(err.toString());
         }
     }
 }

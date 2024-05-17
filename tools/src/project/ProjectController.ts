@@ -9,5 +9,5 @@ export class ProjectController {
     constructor(private _model: ProjectModel, private _context: vscode.ExtensionContext) {
     }
 
-    public dispose(): void {}
+    public dispose(): void { }
 }

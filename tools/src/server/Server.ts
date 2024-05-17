@@ -2,13 +2,15 @@
 
 import * as vscode from "vscode";
 import * as path from "path";
+import * as fs from "fs";
 
-import { ServerTreeFile } from "./ServerTreeFile";
-import { ServerTreeModel } from "./ServerTreeModel";
+import { TOML } from "../util/Toml";
+import * as childProcess from "child_process";
+import { ProcessBuilder } from "../util/ProcessBuilder";
 
 
 export const JVM_OPTION_FILE: string = 'jvm.options';
-export const DEBUG_ARGUMENT_KEY: string = '-agentlib:jdwp=transport=dt_socket,suspend=n,server=y,address=localhost:';
+export const JVM_OPTION_DEBUG: string = '-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=';
 export const JAVA_IO_TEMP_DIR_KEY: string = '-Djava.io.tmpdir';
 export const ENCODING: string = '-Dfile.encoding=UTF8';
 export const DEBUG_SESSION_NAME: string = 'Platform Debug (Attach)';
@@ -20,19 +22,17 @@ export enum ServerState {
     IdleServer = 'idleserver'
 }
 
+
 export abstract class Server {
 
     private _state: ServerState = ServerState.IdleServer;
 
 
-    public needRestart: boolean = false;
-    public basePathName: string;
     public modelLocation: string | undefined;
 
     private _debugPort: number;
 
     constructor(private _name: string, private _installPath: string, private _storagePath: string) {
-        this.basePathName = path.basename(_storagePath);
         this._debugPort = 0;
     }
 
@@ -42,8 +42,8 @@ export abstract class Server {
 
     public abstract getType(): string;
 
-    public clearDebugInfo(): void {
-        this._debugPort = 0;
+    public isDebugging(): boolean {
+        return this._debugPort > 0;
     }
 
     public getDebugPort(): number {
@@ -52,10 +52,6 @@ export abstract class Server {
 
     public setDebugPort(port: number): void {
         this._debugPort = port;
-    }
-
-    public isDebugging(): boolean {
-        return this._debugPort > 0;
     }
 
     public setStarted(started: boolean): void {
@@ -85,13 +81,13 @@ export abstract class Server {
 
     public abstract getConfigPath(): string;
 
-    public abstract getCommand(): string;
-
-    public abstract getArguments(command: string): string[];
-
-    public abstract getChildren(context: vscode.ExtensionContext): vscode.TreeItem[];
+    public abstract getFiles(): string[][];
 
     public abstract getDebugConfiguration(): vscode.DebugConfiguration | null;
+
+    public abstract start(outputChannel: vscode.OutputChannel): Promise<void>;
+
+    public abstract stop(outputChannel: vscode.OutputChannel): Promise<void>;
 }
 
 
@@ -100,10 +96,22 @@ export class ServerPlatform extends Server {
 
     private jvmOptionFile: string;
 
-    constructor(_name: string, _installPath: string, _storagePath: string, _location?: string) {
+    constructor(_name: string, _installPath: string, _storagePath: string, context: vscode.ExtensionContext, _location?: string) {
         super(_name, _installPath, _storagePath);
         this.modelLocation = _location;
         this.jvmOptionFile = path.join(_storagePath, JVM_OPTION_FILE);
+
+        if (!fs.existsSync(this.jvmOptionFile)) {
+            const filename = path.join(context.extensionPath, 'resources', JVM_OPTION_FILE);
+            try {
+                if(!fs.existsSync(_storagePath)) {
+                    fs.mkdirSync(_storagePath);
+                }
+                fs.copyFileSync(filename, this.jvmOptionFile);
+            } catch (t) {
+                console.log(t);
+            }
+        }
     }
 
     public getType(): string {
@@ -118,14 +126,16 @@ export class ServerPlatform extends Server {
         return path.join(this.getInstallPath(), 'bin', 'java' + (IS_WINDOWS ? '.exe' : ''));
     }
 
-    public getArguments(command: string): string[] {
-        let args = [
-            "-Xms1024m", "-Xmx4096m",
-            "-Dhttps.protocols=TLSv1,TLSv1.1,TLSv1.2",
-        ];
+    public async getArguments(command: string): Promise<string[]> {
+        let args = ["-Xms1024m", "-Xmx4096m"];
+        if (fs.existsSync(this.jvmOptionFile)) {
+            args = (await TOML.readLines(this.jvmOptionFile));
+        }
+
+        args.push("-Dhttps.protocols=TLSv1,TLSv1.1,TLSv1.2");
 
         if (this.getDebugPort() > 0) {
-            args.push("-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=" + this.getDebugPort());
+            args.push(JVM_OPTION_DEBUG + this.getDebugPort());
         }
 
         if (this.modelLocation) {
@@ -148,7 +158,7 @@ export class ServerPlatform extends Server {
     public getDebugConfiguration(): vscode.DebugConfiguration {
         const config: vscode.DebugConfiguration = {
             type: 'java',
-            name: `${DEBUG_SESSION_NAME}_${this.basePathName}`,
+            name: `${DEBUG_SESSION_NAME}_${path.basename(this.getStoragePath())}`,
             request: 'attach',
             hostName: 'localhost',
             port: this.getDebugPort()
@@ -156,46 +166,29 @@ export class ServerPlatform extends Server {
         return config;
     }
 
-    public getChildren(context: vscode.ExtensionContext): vscode.TreeItem[] {
-        const confPath = {
-            dark: context.asAbsolutePath(path.join('icons', 'dark', 'settings-gear.svg')),
-            light: context.asAbsolutePath(path.join('icons', 'light', 'settings-gear.svg'))
-        };
-        const javaPath = {
-            dark: context.asAbsolutePath(path.join('icons', 'dark', 'settings.svg')),
-            light: context.asAbsolutePath(path.join('icons', 'light', 'settings.svg'))
-        };
-        const modelPath = {
-            dark: context.asAbsolutePath(path.join('icons', 'dark', 'archive.svg')),
-            light: context.asAbsolutePath(path.join('icons', 'light', 'archive.svg'))
-        };
-
+    public getFiles(): string[][] {
         return [
-            new ServerTreeFile(this.getConfigPath(), "Server configuration", confPath, this),
-            new ServerTreeFile(path.join(this.getInstallPath(), 'conf', 'logging.properties'), "Logging configuration", confPath, this),
-            new ServerTreeFile(path.join(this.getInstallPath(), 'conf', 'worker.properties'), "Worker configuration", confPath, this),
-            new ServerTreeFile(this.jvmOptionFile, "JVM Options", javaPath, this, "jvm"),
-            new ServerTreeModel("Model", modelPath, this, this.modelLocation)
+            ["Server configuration", this.getConfigPath()],
+            ["Logging configuration", path.join(this.getInstallPath(), 'conf', 'logging.properties')],
+            ["Worker configuration", path.join(this.getInstallPath(), 'conf', 'worker.properties')],
+            ["JVM Options", this.jvmOptionFile]
         ];
-    }
-
-    public getModelChildren(context: vscode.ExtensionContext): vscode.TreeItem[] {
-        if (this.modelLocation) {
-            const confPath = {
-                dark: context.asAbsolutePath(path.join('icons', 'dark', 'settings-gear.svg')),
-                light: context.asAbsolutePath(path.join('icons', 'light', 'settings-gear.svg'))
-            };
-
-            return [
-                new ServerTreeFile(path.join(this.modelLocation, 'server.properties'), "Server configuration", confPath, this),
-                new ServerTreeFile(path.join(this.modelLocation, 'context.properties'), "Context configuration", confPath, this)
-            ];
-        }
-        return [];
     }
 
     public setModel(location: string) {
         this.modelLocation = location;
+    }
+
+    public async start(outputChannel: vscode.OutputChannel): Promise<void> {
+        let args: string[] = await this.getArguments('start');
+        const process: Promise<void> = ProcessBuilder.execute(outputChannel, this.getName(), this.getCommand(), { shell: true }, ...args);
+        this.setStarted(true);
+        return process;
+    }
+
+    public async stop(outputChannel: vscode.OutputChannel): Promise<void> {
+        let args: string[] = await this.getArguments('stop');
+        return ProcessBuilder.execute(outputChannel, this.getName(), this.getCommand(), { shell: true }, ...args);
     }
 }
 
@@ -216,27 +209,46 @@ export class ServerOQL extends Server {
     }
 
     public getCommand(): string {
-        return path.join(this.getInstallPath(), 'bin', 'smartIO-odb' + (IS_WINDOWS ? '.exe' : ''));
+        return path.join(this.getInstallPath(), 'bin', 'smartIO-odb' + (IS_WINDOWS ? '.bat' : '.sh'));
     }
 
-    public getArguments(command: string): string[] {
-        let args: string[] = [];
-
-        return args;
-    }
-
-    public getChildren(context: vscode.ExtensionContext): vscode.TreeItem[] {
-        const confPath = {
-            dark: context.asAbsolutePath(path.join('icons', 'dark', 'settings-gear.svg')),
-            light: context.asAbsolutePath(path.join('icons', 'light', 'settings-gear.svg'))
-        };
+    public getFiles(): string[][] {
         return [
-            new ServerTreeFile(this.getConfigPath(), "Server configuration", confPath, this),
-            new ServerTreeFile(path.join(this.getInstallPath(), 'conf', 'odb-logging.properties'), "Logging configuration", confPath, this)
+            ["Server configuration", this.getConfigPath()],
+            ["Logging configuration", path.join(this.getInstallPath(), 'conf', 'odb-logging.properties')]
         ];
     }
 
     public getDebugConfiguration(): null {
         return null;
+    }
+
+    public async start(outputChannel: vscode.OutputChannel): Promise<void> {
+        ProcessBuilder.exec(outputChannel, this.getName(), this.getCommand(), { shell: true });
+        this.setStarted(true);
+        return new Promise<void>(() => {});
+        // const p = ProcessBuilder.exec(outputChannel, this.getName(), this.getCommand(), { shell: true });
+        // this.setStarted(true);
+        // return new Promise<void>((resolve: () => void, reject: (e: Error) => void) => {
+        //     p.on('error', (err: Error) => {
+        //         reject(err);
+        //     });
+        //     p.on('exit', (code: number) => {
+        //         if (code !== 0) {
+        //             reject(new Error('Command failed with exit code ' + code));
+        //         }
+        //         resolve();
+        //     });
+        // });
+    }
+
+    public async stop(outputChannel: vscode.OutputChannel): Promise<void> {
+        ProcessBuilder.exec(outputChannel, this.getName(), this.getCommand(), { shell: true }, '-t');
+        // if(this._process) {
+        //     this.setStarted(false);
+        //     this._process.kill();
+        // }
+        this.setStarted(false);
+        return new Promise<void>(() => {});
     }
 }

@@ -50,8 +50,7 @@ export namespace TOML {
         const filter: (line: string) => boolean = (line: string): boolean => {
             return !line.startsWith(";") && !line.startsWith("#") && line.trim().length > 0;
         };
-        const lines: string[] = await TOML.readFileLineByLine(file, filter);
-        return lines;
+        return await TOML.readFileLineByLine(file, filter);
     }
 
     export async function readFileLineByLine(file: string, filterFunction?: (value: string) => boolean): Promise<string[]> {
