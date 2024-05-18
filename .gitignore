@@ -3,3 +3,7 @@ dist
 node_modules
 .vscode-test/
 *.vsix
+
+web/.vscode-test-web/
+
+package-lock.json
