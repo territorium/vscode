@@ -1,9 +1,9 @@
 out
 dist
 node_modules
-.vscode-test/
-*.vsix
-
-web/.vscode-test-web/
-
 package-lock.json
+*.vsix
+.vscode-test/
+.vscode-test-web/
+
+

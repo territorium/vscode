@@ -1,0 +1,335 @@
+{
+  "name": "ide",
+  "displayName": "TOL IDE",
+  "description": "TOL Development tools for VSCode",
+  "version": "0.2.1",
+  "publisher": "TOL",
+  "icon": "logo.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/territorium/vscode.git"
+  },
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.89.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "TOL",
+    "MDA",
+    "smart.IO"
+  ],
+  "activationEvents": [
+    "onLanguage:xml"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "views": {
+      "explorer": [
+        {
+          "id": "projectExplorer",
+          "name": "smart.IO"
+        }
+      ],
+      "debug": [
+        {
+          "id": "serverExplorer",
+          "name": "TOL Servers"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "tol.refreshServerView",
+        "title": "Refresh Servers",
+        "category": "TOL",
+        "icon": {
+          "light": "icons/light/refresh.svg",
+          "dark": "icons/dark/refresh.svg"
+        }
+      },
+      {
+        "command": "tol.refreshProjectView",
+        "title": "Refresh Projects",
+        "category": "TOL",
+        "icon": {
+          "light": "icons/light/refresh.svg",
+          "dark": "icons/dark/refresh.svg"
+        }
+      },
+      {
+        "command": "server.add",
+        "title": "Add smart.IO Server",
+        "category": "TOL",
+        "icon": {
+          "light": "icons/light/add.svg",
+          "dark": "icons/dark/add.svg"
+        }
+      },
+      {
+        "command": "server.delete",
+        "title": "Delete"
+      },
+      {
+        "command": "server.start",
+        "title": "Start",
+        "icon": {
+          "light": "icons/light/debug-start.svg",
+          "dark": "icons/dark/debug-start.svg"
+        }
+      },
+      {
+        "command": "server.debug",
+        "title": "Debug",
+        "icon": {
+          "light": "icons/light/debug-alt-small.svg",
+          "dark": "icons/dark/debug-alt-small.svg"
+        }
+      },
+      {
+        "command": "server.restart",
+        "title": "Restart",
+        "icon": {
+          "light": "icons/light/debug-restart.svg",
+          "dark": "icons/dark/debug-restart.svg"
+        }
+      },
+      {
+        "command": "server.stop",
+        "title": "Stop",
+        "icon": {
+          "light": "icons/light/debug-stop.svg",
+          "dark": "icons/dark/debug-stop.svg"
+        }
+      },
+      {
+        "command": "server.admin",
+        "title": "Open Administration Panel"
+      },
+      {
+        "command": "server.app",
+        "title": "Open Application"
+      },
+      {
+        "command": "tomcat.package",
+        "title": "Generate War Package from Current Folder"
+      },
+      {
+        "command": "server.model",
+        "title": "Select Model"
+      },
+      {
+        "command": "tol.openServerFile",
+        "title": "Open File",
+        "icon": {
+          "light": "icons/light/edit.svg",
+          "dark": "icons/dark/edit.svg"
+        }
+      },
+      {
+        "command": "tol.openProjectFile",
+        "title": "Open File",
+        "icon": {
+          "light": "icons/light/edit.svg",
+          "dark": "icons/dark/edit.svg"
+        }
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "tol.refreshServerView",
+          "when": "view == serverExplorer",
+          "group": "navigation@0"
+        },
+        {
+          "command": "tol.refreshProjectView",
+          "when": "view == projectExplorer",
+          "group": "navigation@0"
+        },
+        {
+          "command": "server.add",
+          "when": "view == serverExplorer",
+          "group": "navigation@1"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "tol.refreshServerView"
+        },
+        {
+          "command": "tol.refreshProjectView"
+        },
+        {
+          "command": "server.app",
+          "when": "never"
+        },
+        {
+          "command": "server.start",
+          "when": "never"
+        },
+        {
+          "command": "server.debug",
+          "when": "never"
+        },
+        {
+          "command": "server.restart",
+          "when": "never"
+        },
+        {
+          "command": "server.stop",
+          "when": "never"
+        },
+        {
+          "command": "server.admin",
+          "when": "never"
+        },
+        {
+          "command": "server.delete",
+          "when": "never"
+        },
+        {
+          "command": "server.model",
+          "when": "never"
+        },
+        {
+          "command": "tol.openServerFile",
+          "when": "never"
+        },
+        {
+          "command": "tol.openProjectFile",
+          "when": "never"
+        }
+      ],
+      "explorer/context": [],
+      "view/item/context": [
+        {
+          "command": "server.debug",
+          "when": "view == serverExplorer && viewItem && viewItem == idleserver",
+          "group": "inline"
+        },
+        {
+          "command": "server.start",
+          "when": "view == serverExplorer && viewItem == idleserver",
+          "group": "inline"
+        },
+        {
+          "command": "server.restart",
+          "when": "view == serverExplorer && viewItem == runningserver",
+          "group": "inline"
+        },
+        {
+          "command": "server.stop",
+          "when": "view == serverExplorer && viewItem == runningserver",
+          "group": "inline"
+        },
+        {
+          "command": "server.app",
+          "when": "view == serverExplorer && viewItem && viewItem == runningserver",
+          "group": "tomcat@3"
+        },
+        {
+          "command": "server.admin",
+          "when": "view == serverExplorer && viewItem && viewItem == runningserver",
+          "group": "tomcat@4"
+        },
+        {
+          "command": "server.delete",
+          "when": "view == serverExplorer && viewItem && viewItem == idleserver",
+          "group": "tomcat@9"
+        },
+        {
+          "command": "server.add",
+          "when": "view == serverExplorer && !viewItem"
+        },
+        {
+          "command": "server.model",
+          "when": "view == serverExplorer && viewItem == model",
+          "group": "model@1"
+        }
+      ]
+    },
+    "configuration": [
+      {
+        "id": "tol-web-extension",
+        "title": "smart.IO Configuration",
+        "order": 22,
+        "properties": {
+          "smartio.chrome": {
+            "type": "string",
+            "default": "/opt/google/chrome/chrome",
+            "description": "Chrome location"
+          },
+          "smartio.chromePort": {
+            "type": "integer",
+            "default": 9222,
+            "description": "Chrome debugger port"
+          },
+          "smartio.workspace": {
+            "type": "string",
+            "default": "",
+            "description": "Platform workspace."
+          },
+          "smartio.restart_when_change": {
+            "type": "boolean",
+            "default": false,
+            "description": "Restart Platform Server when project changes"
+          },
+          "smartio.customEnv": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "title": "environment setting",
+              "required": [
+                "environmentVariable",
+                "value"
+              ],
+              "properties": {
+                "environmentVariable": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Name of the environment variable to set."
+                },
+                "value": {
+                  "type": "string",
+                  "description": "Value of the environment variable to set."
+                }
+              }
+            },
+            "default": [],
+            "description": "Specifies an array of environment variable names and values. These environment variable values will be passed when tomcat starts.",
+            "scope": "window"
+          }
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.89.0",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.12.12",
+    "@typescript-eslint/eslint-plugin": "^7.10.0",
+    "@typescript-eslint/parser": "^7.10.0",
+    "typescript": "^5.4.5",
+    "@types/fs-extra": "^11.0.4",
+    "@vscode/test-cli": "^0.0.9",
+    "@vscode/test-electron": "^2.3.9",
+    "@types/lodash": "4.17.0"
+  },
+  "dependencies": {
+    "lodash": "^4.17.15",
+    "portfinder": "^1.0.13",
+    "fs-extra": "^11.2.0",
+    "readline": "^1.3.0"
+  }
+}
