@@ -2,15 +2,16 @@
 
 import * as vscode from "vscode";
 import * as path from "path";
-import * as fs from "fs";
-import { opendir } from 'fs/promises';
 
-import { TOML, Parameter } from "../util/Toml";
+import { INI, Parameter, Utility } from "../util/Utility";
+
+
+const FILTER: RegExp = new RegExp("^[^\.]+\.(ui\.xml|xml|properties|js)$", "i");
 
 
 export class ProjectNode {
 
-    constructor(private name: string, private type: string,) {
+    constructor(private name: string, private type: string, protected uri: vscode.Uri) {
     }
 
     public getName(): string {
@@ -21,6 +22,10 @@ export class ProjectNode {
         return this.type;
     }
 
+    public getUri(): vscode.Uri {
+        return this.uri;
+    }
+
     public async getChildren(): Promise<ProjectNode[]> {
         return [];
     }
@@ -29,73 +34,101 @@ export class ProjectNode {
 
 export class Project extends ProjectNode {
 
-    private config: string;
-
     constructor(private folder: vscode.WorkspaceFolder) {
-        super(folder.name, "project");
-        const p1 = path.join(this.folder.uri.path, "context.properties");
-        const p2 = path.join(this.folder.uri.path, "smartIO", "context.properties");
-        this.config = fs.existsSync(p1) ? p1 : p2;
+        super(folder.name, "project", folder.uri);
+        const uri2 = vscode.Uri.joinPath(folder.uri, "smartIO");
+        vscode.workspace.fs.stat(vscode.Uri.joinPath(uri2, "context.properties")).then(() => this.uri = uri2);
+
     }
 
     public async getChildren(): Promise<ProjectNode[]> {
-        const toml = await TOML.read(this.config);
-        const list = toml.keys().filter(k => k.startsWith("model.")) ?? [];
-        list.map(n => {
-            return n;
-        });
-        return toml.keys().filter(k => k.startsWith("model.")).map(k => new ModelTreeItem(k.substring(6), this.config, toml.get(k))) ?? [];
+        let uris = await vscode.workspace.findFiles("**/context.properties");
+        uris.forEach(i => console.log(i));
+
+        const config = await INI.parse(vscode.Uri.joinPath(this.uri, "context.properties"));
+        const list = config.keys().filter(k => k.startsWith("model.")) ?? [];
+        return list.map(k => new ModelTreeItem(k.substring(6), this.uri, config.get(k))) ?? [];
+    }
+
+    public static isValid(folder: vscode.WorkspaceFolder): boolean {
+        const p1 = path.join(folder.uri.path, "context.properties");
+        const p2 = path.join(folder.uri.path, "smartIO", "context.properties");
+        return true;//fs.existsSync(p1) || fs.existsSync(p2);
     }
 }
 
-export class ModelTreeItem extends ProjectNode {
 
-    private path: string;
+abstract class AbstractProjectNode extends ProjectNode {
 
-    constructor(name: string, config: string, private parameter: Parameter) {
-        super(name, "model");
-        this.path = path.join(path.dirname(config), parameter["path"] ?? name);
+    constructor(name: string, type: string, uri: vscode.Uri) {
+        super(name, type, uri);
+        this.uri = uri;
     }
 
     public async getChildren(): Promise<ProjectNode[]> {
+        const children: FileTreeItem[] = [];
         try {
-            const files: fs.Dirent[] = [];
-            const dir = await opendir(this.path);
-            for await (const e of dir) { files.push(e); }
-
-            files.sort((f1, f2) => {
-                if (f1.isDirectory() && f2.isFile()) { return -1; }
-                if (f2.isDirectory() && f1.isFile()) { return 1; }
-                return f1.path.localeCompare(f2.path);
+            const array = await vscode.workspace.fs.readDirectory(this.uri);
+            array.filter((value, index, array) => FILTER.test(value[0])).forEach((value, index, array) => {
+                children.push(new FileTreeItem(vscode.Uri.joinPath(this.uri, value[0])));
             });
 
-            const children: ProjectNode[] = [];
-            files.forEach(f => children.push(new FileTreeItem(f.path)));
-            return children;
+            children.sort((f1, f2) => {
+                if (f1.isLeaf() && !f2.isLeaf()) { return 1; }
+                if (f2.isLeaf() && !f1.isLeaf()) { return -1; }
+                return f1.filename.localeCompare(f2.filename);
+            });
         } catch (err) {
             console.error(err);
         }
-        return [];
+        return children;
     }
 }
 
-export class FileTreeItem extends ProjectNode {
 
-    constructor(public file: string) {
-        super(path.basename(file), file.indexOf(".") < 0 ? "folder" : "file");
+export class ModelTreeItem extends AbstractProjectNode {
+
+    private lines: string[] = [];
+
+    constructor(name: string, uri: vscode.Uri, private parameter: Parameter) {
+        super(name, "model", vscode.Uri.joinPath(uri, parameter["path"] ?? name));
+        const uri2 = vscode.Uri.joinPath(this.uri, "modules.txt");
+        vscode.workspace.fs.stat(uri2).then(() => Utility.readLines(uri2, this.lines));
     }
 
     public async getChildren(): Promise<ProjectNode[]> {
-        if (this.file.indexOf(".") < 0) {
-            try {
-                const children: ProjectNode[] = [];
-                const dir = await opendir(this.file);
-                for await (const e of dir) { children.push(new FileTreeItem(e.path)); }
-                return children;
-            } catch (err) {
-                console.error(err);
-            }
+        const children: FileTreeItem[] = [];
+        try {
+            const array = await vscode.workspace.fs.readDirectory(this.uri);
+            array.filter((value, index, array) => FILTER.test(value[0])).forEach((value, index, array) => {
+                children.push(new FileTreeItem(vscode.Uri.joinPath(this.uri, value[0])));
+            });
+            const uri = vscode.Uri.joinPath(this.uri, "..", "..", "smartio-config", "fm");
+            this.lines.forEach(n => children.push(new FileTreeItem(vscode.Uri.joinPath(uri, n))));
+
+            children.sort((f1, f2) => {
+                if (f1.isLeaf() && !f2.isLeaf()) { return 1; }
+                if (f2.isLeaf() && !f1.isLeaf()) { return -1; }
+                return f1.filename.localeCompare(f2.filename);
+            });
+        } catch (err) {
+            console.error(err);
         }
-        return [];
+        return children;
+    }
+}
+
+
+export class FileTreeItem extends AbstractProjectNode {
+
+    public filename: string;
+
+    constructor(uri: vscode.Uri) {
+        super(path.basename(uri.fsPath), path.basename(uri.fsPath).indexOf(".") < 0 ? "folder" : "file", uri);
+        this.filename = path.basename(uri.fsPath);
+    }
+
+    public isLeaf(): boolean {
+        return this.getType() !== "folder";
     }
 }

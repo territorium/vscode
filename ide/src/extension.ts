@@ -8,10 +8,6 @@ import { ServerModel } from "./server/ServerModel";
 import { ServerController } from "./server/ServerController";
 import { ServerTreeProvider, ServerTreeItem } from "./server/ServerTreeProvider";
 
-import { ProjectModel } from "./project/ProjectModel";
-import { ProjectController } from "./project/ProjectController";
-import { ProjectTreeProvider } from "./project/ProjectTreeProvider";
-import { ProcessBuilder } from "./util/ProcessBuilder";
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -19,13 +15,7 @@ export function activate(context: vscode.ExtensionContext) {
 	let storageUri: vscode.Uri = context.globalStorageUri;
 	// let storageUri: vscode.Uri = context.storageUri;
 
-	const projectModel = new ProjectModel(storageUri.path, context);
-	// const projectController = new ProjectController(projectModel, context);
-	const projectTreeProvider = new ProjectTreeProvider(projectModel, context);
-
-	vscode.window.registerTreeDataProvider('projectExplorer', projectTreeProvider);
-
-	const model = new ServerModel(storageUri.fsPath, context);
+	const model = new ServerModel(storageUri, context);
 	const controller = new ServerController(model, context);
 	const treeProvider = new ServerTreeProvider(model, context);
 
@@ -43,7 +33,6 @@ export function activate(context: vscode.ExtensionContext) {
 	vscode.commands.registerCommand('server.admin', (item: ServerTreeItem) => controller.openExternal(item.getServer(), "http://localhost:8088"));
 
 	vscode.commands.registerCommand('server.model', (item: ServerTreeItem) => controller.selectModel(item.getServer()));
-
 
 	// vscode.commands.registerCommand('chrome.debug', () => {
 	// 	ProcessBuilder.execute2("/opt/google/chrome/chrome",{ shell: true }, "--remote-debugging-port=9222", "--user-data-dir=/home/brigl/.local/share/TOL/devtools/chrome-tmp", "--headless", "--disable-gpu");

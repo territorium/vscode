@@ -1,0 +1,15 @@
+{
+  "name": "tol-extension-pack",
+  "displayName": "TOL Developer Tools",
+  "description": "TOL Extension Pack",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.89.0"
+  },
+  "categories": [
+    "Extension Packs"
+  ],
+  "extensionPack": [ 
+    "publisher.extensionName"
+  ]
+}

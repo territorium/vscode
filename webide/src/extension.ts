@@ -11,8 +11,8 @@ import { LanguageClientOptions, CloseAction, ErrorAction } from 'vscode-language
 import { LanguageClient } from "./monaco";
 // import { LanguageClient } from 'vscode-languageclient/browser';
 
-// import { ProjectModel } from "./project/ProjectModel";
-// import { ProjectProvider } from "./project/ProjectProvider";
+import { ProjectModel } from "./project/ProjectModel";
+import { ProjectProvider } from "./project/ProjectProvider";
 
 
 let client: LanguageClient | undefined;
@@ -24,11 +24,10 @@ export async function activate(context: vscode.ExtensionContext) {
 	let storageUri: vscode.Uri = context.globalStorageUri;
 	let wsUri: string = workbenchConfig.get('languageServerSettings.websocket', 'localhost:8088/lsp/service');
 
+	const projectModel = new ProjectModel(storageUri.path, context);
+	const projectProvider = new ProjectProvider(projectModel, context);
 
-	// const projectModel = new ProjectModel(storageUri.path, context);
-	// const projectProvider = new ProjectProvider(projectModel, context);
-
-	// vscode.window.registerTreeDataProvider('projectExplorer', projectProvider);
+	vscode.window.registerTreeDataProvider('projectExplorer', projectProvider);
 
 	/*
 	 * all except the code to create the language client in not browser specific

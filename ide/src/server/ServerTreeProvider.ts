@@ -54,7 +54,7 @@ export class ServerTreeProvider implements vscode.TreeDataProvider<TreeItem> {
             return this._model.getServerList().map((server: Server) => {
                 const item = new ServerTreeItem(server);
                 item.contextValue = server.getState();
-                item.iconPath = this.resolveIcon(`${server.getIcon()}.svg`);
+                item.iconPath = Utility.toIconPath(`${server.getIcon()}.svg`, this._context);
                 item.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
                 return item;
             });
@@ -65,16 +65,16 @@ export class ServerTreeProvider implements vscode.TreeDataProvider<TreeItem> {
             case "model": const model = <ServerTreeItem>element;
                 const location = model.getServer().modelLocation;
                 if (location) {
-                    let node = new TreeItem(vscode.Uri.parse(path.join(location, 'server.properties')));
+                    let node = new TreeItem(vscode.Uri.joinPath(location, 'server.properties'));
                     node.label = "Server configuration";
                     node.contextValue = "toml";
-                    node.iconPath = this.resolveIcon('settings-gear.svg');
+                    node.iconPath = Utility.toIconPath('settings-gear.svg', this._context);
                     children.push(node);
 
-                    node = new TreeItem(vscode.Uri.parse(path.join(location, 'context.properties')));
+                    node = new TreeItem(vscode.Uri.joinPath(location, 'context.properties'));
                     node.label = "Context configuration";
                     node.contextValue = "toml";
-                    node.iconPath = this.resolveIcon('settings-gear.svg');
+                    node.iconPath = Utility.toIconPath('settings-gear.svg', this._context);
                     children.push(node);
                 }
                 break;
@@ -86,11 +86,11 @@ export class ServerTreeProvider implements vscode.TreeDataProvider<TreeItem> {
                     const node = new TreeItem(vscode.Uri.parse(i[1]));
                     node.label = path.basename(i[0]);
                     node.contextValue = "toml";
-                    node.iconPath = this.resolveIcon('settings-gear.svg');
+                    node.iconPath = Utility.toIconPath('settings-gear.svg', this._context);
 
                     if (i[1].endsWith("jvm.options")) {
                         node.contextValue = "jvm";
-                        node.iconPath = this.resolveIcon('settings.svg');
+                        node.iconPath = Utility.toIconPath('settings.svg', this._context);
                     }
 
                     children.push(node);
@@ -98,9 +98,9 @@ export class ServerTreeProvider implements vscode.TreeDataProvider<TreeItem> {
 
                 if (server.getType() === "platform") {
                     const node = new ServerTreeItem(server);
-                    node.label = server.modelLocation ? path.basename(server.modelLocation) : "<Select Model>";
+                    node.label = server.modelLocation ? path.basename(server.modelLocation.fsPath) : "<Select Model>";
                     node.contextValue = "model";
-                    node.iconPath = this.resolveIcon('archive.svg');
+                    node.iconPath = Utility.toIconPath('archive.svg', this._context);
                     node.collapsibleState = server.modelLocation ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None;
                     children.push(node);
                 }
@@ -115,18 +115,11 @@ export class ServerTreeProvider implements vscode.TreeDataProvider<TreeItem> {
         }
 
         if (item.contextValue === "jvm" || item.contextValue === "toml") {
-            Utility.openFile(item.resourceUri.fsPath);
+            Utility.openUri(item.resourceUri);
         }
     }
 
     public dispose(): void {
         this._onDidChangeTreeData.dispose();
-    }
-
-    private resolveIcon(name: string): { dark: vscode.Uri; light: vscode.Uri; } {
-        return {
-            dark: vscode.Uri.parse(this._context.asAbsolutePath(path.join('icons', 'dark', name))),
-            light: vscode.Uri.parse(this._context.asAbsolutePath(path.join('icons', 'light', name)))
-        };
     }
 }

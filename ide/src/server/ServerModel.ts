@@ -2,29 +2,46 @@
 
 import * as vscode from "vscode";
 import * as path from "path";
-import * as fse from "fs-extra";
+import * as fs from "fs";
 
 import { Workspace } from "../util/Workspace";
+
 import { Server, ServerPlatform, ServerOQL, IS_WINDOWS, DEBUG_SESSION_NAME } from "./Server";
 
 
 class ModelConfig {
 
-    constructor(public _name: string, public _installPath: string,
-        public _storagePath: string, public _type: string, public _model?: string) {
+    public _name: string;
+    public _installPath: string;
+    public _storagePath: string;
+    public _type: string;
+    public _model?: string;
+
+    constructor(s: Server) {
+        this._name = s.getName();
+        this._installPath = s.getInstallPath().fsPath;
+        this._storagePath = s.getStoragePath().fsPath;
+        this._type = s.getType();
+        this._model = s.modelLocation?.fsPath;
+    }
+
+    public static create(config: ModelConfig, context: vscode.ExtensionContext): Server {
+        if (config._type === "server") {
+            return new ServerOQL(config._name, vscode.Uri.parse(config._installPath), vscode.Uri.parse(config._storagePath));
+        }
+        const location = config._model ? vscode.Uri.parse(config._model) : undefined;
+        return new ServerPlatform(config._name, vscode.Uri.parse(config._installPath), vscode.Uri.parse(config._storagePath), context.extensionUri, location);
     }
 }
 
 export class ServerModel {
 
-    private _config: string;
     private _serverList: Server[];
 
-    constructor(public defaultStoragePath: string, private context: vscode.ExtensionContext) {
-        this._config = path.join(defaultStoragePath, 'servers.json');
+    constructor(private uri: vscode.Uri, private context: vscode.ExtensionContext) {
         this._serverList = [];
 
-        this.loadServerList(context);
+        this.loadServerList();
 
         vscode.debug.onDidTerminateDebugSession((session: vscode.DebugSession) => {
             if (session && session.name && session.name.startsWith(DEBUG_SESSION_NAME)) {
@@ -37,14 +54,10 @@ export class ServerModel {
         return this._serverList;
     }
 
-    public setModelPath(server: Server, location: string) {
+    public setModelPath(server: Server, location: vscode.Uri) {
         (<ServerPlatform>server).setModel(location);
         this.saveServerListSync();
         vscode.commands.executeCommand('tol.refreshServerView');
-    }
-
-    public getServerByName(serverName: string): Server | undefined {
-        return this._serverList.find((item: Server) => item.getName() === serverName);
     }
 
     public deleteServer(server: Server): boolean {
@@ -52,7 +65,7 @@ export class ServerModel {
         if (index > -1) {
             const oldServer = this._serverList.splice(index, 1);
             if (oldServer.length > 0) {
-                fse.remove(server.getStoragePath());
+                Workspace.removeDir(server.getStoragePath());
                 this.saveServerListSync();
 
                 vscode.commands.executeCommand('tol.refreshServerView');
@@ -63,17 +76,25 @@ export class ServerModel {
         return false;
     }
 
-    public async addServerPath(installPath: string): Promise<void> {
+    public async addServerPath(installPath: vscode.Uri): Promise<void> {
         const existingServerNames: string[] = this.getServerList().map((item: Server) => { return item.getName(); });
-        const serverName: string = await Workspace.getServerName(installPath, this.defaultStoragePath, existingServerNames);
-        const storagePath: string = await Workspace.getStoragePath(this.defaultStoragePath, serverName);
-        fse.remove(storagePath);
-
-        if (await fse.pathExists(path.join(installPath, "bin", "smartIO" + (IS_WINDOWS ? '.exe' : '')))) {
-            this.addServer(new ServerPlatform(serverName + " Platform", installPath, storagePath, this.context));
+        const workspace = Workspace.getWorkspace(this.uri);
+        const fileNames: string[] = await Workspace.readFileNames(workspace);
+        let serverName: string = path.basename(installPath.fsPath);
+        let index: number = 1;
+        while (fileNames.indexOf(serverName) >= 0 || existingServerNames.indexOf(serverName) >= 0) {
+            serverName = serverName.concat(`-${index}`);
+            index += 1;
         }
 
-        if (await fse.pathExists(path.join(installPath, "bin", "smartIO-odb" + (IS_WINDOWS ? '.exe' : '')))) {
+        const storagePath: vscode.Uri = vscode.Uri.joinPath(workspace, serverName);
+        Workspace.removeDir(storagePath);
+
+        if (fs.existsSync(vscode.Uri.joinPath(installPath, "bin", "smartIO" + (IS_WINDOWS ? '.exe' : '')).fsPath)) {
+            this.addServer(new ServerPlatform(serverName + " Platform", installPath, storagePath, this.context.extensionUri));
+        }
+
+        if (fs.existsSync(vscode.Uri.joinPath(installPath, "bin", "smartIO-odb" + (IS_WINDOWS ? '.exe' : '')).fsPath)) {
             this.addServer(new ServerOQL(serverName + " Server", installPath, storagePath));
         }
     }
@@ -89,30 +110,13 @@ export class ServerModel {
         vscode.commands.executeCommand('tol.refreshServerView');
     }
 
-    private loadServerList(context: vscode.ExtensionContext): void {
-        try {
-            if (fse.existsSync(this._config)) {
-                const objArray: ModelConfig[] = fse.readJsonSync(this._config);
-                if (objArray.length > 0) {
-                    this._serverList = this._serverList.concat(objArray.map(
-                        obj => {
-                            return (obj._type === "server") ? new ServerOQL(obj._name, obj._installPath, obj._storagePath)
-                                : new ServerPlatform(obj._name, obj._installPath, obj._storagePath, context, obj._model);
-                        }));
-                }
-            }
-        } catch (err) {
-            console.error(err);
-        }
+    private loadServerList(): void {
+        const config = vscode.Uri.joinPath(this.uri, 'servers.json');
+        this._serverList = Workspace.loadList(config.fsPath).map(o => ModelConfig.create(o, this.context));
     }
 
     public saveServerListSync(): void {
-        try {
-            fse.outputJsonSync(this._config, this._serverList.map((s: Server) => {
-                return new ModelConfig(s.getName(), s.getInstallPath(), s.getStoragePath(), s.getType(), s.modelLocation);
-            }));
-        } catch (err: any) {
-            console.error(err.toString());
-        }
+        const config = vscode.Uri.joinPath(this.uri, 'servers.json');
+        Workspace.saveList(config.fsPath, this._serverList.map(i => new ModelConfig(i)));
     }
 }

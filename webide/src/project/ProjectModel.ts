@@ -1,9 +1,6 @@
 'use strict';
 
 import * as vscode from "vscode";
-import * as fs from "fs";
-import * as path from "path";
-
 import { Project } from "./Project";
 
 export class ProjectModel {
@@ -18,12 +15,8 @@ export class ProjectModel {
     }
 
     public async scan(): Promise<void> {
-        this._items = vscode.workspace.workspaceFolders?.filter((f: vscode.WorkspaceFolder): boolean => {
-            const p1 = path.join(f.uri.path, "context.properties");
-            const p2 = path.join(f.uri.path, "smartIO", "context.properties");
-            return fs.existsSync(p1) || fs.existsSync(p2);
-        }).map(f => new Project(f)) ?? [];
-
+        this._items = vscode.workspace.workspaceFolders?.filter((f: vscode.WorkspaceFolder): boolean => Project.isValid(f)).map(f => new Project(f)) ?? [];
+        
         vscode.commands.executeCommand('tol.refreshProjectView');
     }
 

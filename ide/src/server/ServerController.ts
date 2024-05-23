@@ -2,11 +2,8 @@
 
 import * as vscode from "vscode";
 import * as path from "path";
-
 import * as fs from "fs";
-import * as fse from "fs-extra";
 
-// tslint:disable-next-line:no-require-imports
 import { MessageItem } from "vscode";
 
 import { DialogMessage } from '../util/DialogMessage';
@@ -23,11 +20,11 @@ export class ServerController {
         this._outputChannel = vscode.window.createOutputChannel('vscode-tol');
     }
 
-    async validateInstallPath(installPath: string): Promise<boolean> {
-        const configFileExists = await fse.pathExists(path.join(installPath, 'conf', 'server.properties'));
-        const loggingFileExists = await fse.pathExists(path.join(installPath, 'conf', 'logging.properties'));
-        const odbConfigFileExists = await fse.pathExists(path.join(installPath, 'bin', 'odb-server.properties'));
-        const odbLoggingFileExists = await fse.pathExists(path.join(installPath, 'bin', 'odb-logging.properties'));
+    async validateInstallPath(installPath: vscode.Uri): Promise<boolean> {
+        const configFileExists = fs.existsSync(vscode.Uri.joinPath(installPath, 'conf', 'server.properties').fsPath);
+        const loggingFileExists = fs.existsSync(vscode.Uri.joinPath(installPath, 'conf', 'logging.properties').fsPath);
+        const odbConfigFileExists = fs.existsSync(vscode.Uri.joinPath(installPath, 'bin', 'odb-server.properties').fsPath);
+        const odbLoggingFileExists = fs.existsSync(vscode.Uri.joinPath(installPath, 'bin', 'odb-logging.properties').fsPath);
         return (configFileExists && loggingFileExists) || (odbConfigFileExists && odbLoggingFileExists);
     }
 
@@ -42,7 +39,7 @@ export class ServerController {
 
         if (pathPicker) {
             for (let i = 0; i < pathPicker.length; i++) {
-                const installPath: string = pathPicker[i].fsPath;
+                const installPath = pathPicker[i];
                 if (!this.validateInstallPath(installPath)) {
                     vscode.window.showErrorMessage("Invalid Server Directory");
                     return;
@@ -79,7 +76,7 @@ export class ServerController {
             });
 
             if (pathPicker) {
-                this._model.setModelPath(server, path.parse(pathPicker[0].fsPath).dir);
+                this._model.setModelPath(server, vscode.Uri.parse(path.parse(pathPicker[0].fsPath).dir));
             }
         }
     }
@@ -91,8 +88,7 @@ export class ServerController {
                 return;
             }
 
-            server.setDebugPort(debug ? 8004 : -1),
-                await this.startInternally(server);
+            await this.startInternally(server, debug);
         }
     }
 
@@ -106,7 +102,7 @@ export class ServerController {
             await server.stop(this._outputChannel);
 
             if (restart) {
-                await this.startInternally(server);
+                await this.startInternally(server, server.isDebugging());
             }
         }
     }
@@ -126,10 +122,24 @@ export class ServerController {
         }
     }
 
-    private async startInternally(server: Server): Promise<void> {
-        const serverConfig: string = server.getConfigPath();
+    private async startInternally(server: Server, debug?: boolean): Promise<void> {
+        const serverConfig = server.getConfigPath();
 
-        let watcher = fs.watch(serverConfig);
+        // CHECK for debugging
+        let workspaceFolder: vscode.WorkspaceFolder | undefined;
+        if (vscode.workspace.workspaceFolders) {
+            const found = (vscode.workspace.workspaceFolders.length === 1);
+            workspaceFolder = found ? vscode.workspace.workspaceFolders[0] : await vscode.window.showWorkspaceFolderPick();
+        }
+
+        if (debug && !workspaceFolder) {
+            vscode.window.showInformationMessage("No workspace found! Starting without debugging!");
+        }
+
+        server.setDebugPort(debug && workspaceFolder ? 8004 : -1);
+        // CHECK for debugging
+
+        let watcher = fs.watch(serverConfig.fsPath);
         try {
             watcher.on('change', async () => {
                 //     if (serverPort !== await Utility.getPort(serverConfig, Constants.PortKind.Server)) {
@@ -157,7 +167,18 @@ export class ServerController {
 
             const process = server.start(this._outputChannel);
             server.setStarted(true);
-            this.startDebugSession(server);
+
+            // START debugging
+            if (server.isDebugging() && workspaceFolder) {
+                const config = server.getDebugConfiguration();
+                if (config) {
+                    vscode.debug.stopDebugging();
+                    setTimeout(() => vscode.debug.startDebugging(workspaceFolder, config), 500);
+                }
+            }
+
+            // END debugging
+
             await process;
         } catch (err: any) {
             vscode.window.showErrorMessage(err.toString());
@@ -166,26 +187,6 @@ export class ServerController {
             if (watcher) {
                 watcher.close();
             }
-        }
-    }
-
-    private startDebugSession(server: Server): void {
-        let uri = vscode.Uri.parse("/data/smartIO/release2504/server");
-        let workspaceFolder: vscode.WorkspaceFolder | undefined;
-        if (vscode.workspace.workspaceFolders) {
-            workspaceFolder = vscode.workspace.workspaceFolders.find((f: vscode.WorkspaceFolder): boolean => {
-                console.log("Workspace Folder", f.name, f.uri);
-                const relativePath: string = path.relative(f.uri.fsPath, uri.fsPath);
-                return relativePath === '' || (!relativePath.startsWith('..') && relativePath !== uri.fsPath);
-            });
-        }
-
-        if (!server.isDebugging() || !workspaceFolder) {
-            return;
-        }
-        const config = server.getDebugConfiguration();
-        if (config) {
-            setTimeout(() => vscode.debug.startDebugging(workspaceFolder, config), 500);
         }
     }
 
@@ -271,30 +272,5 @@ export class ServerController {
 
     // private isWarFile(filePath: string): boolean {
     //     return path.extname(filePath).toLocaleLowerCase() === '.war';
-    // }
-
-    // /* tslint:disable:no-any */
-    // private async determineAppName(webappPath: string, item: ServerTreeItem): Promise<string> {
-    //     const defaultName: string = path.basename(webappPath, path.extname(webappPath));
-    //     let appName: string = defaultName;
-    //     let folderLocation: string;
-    //     if (this.isWarFile(webappPath)) {
-    //         folderLocation = path.join(this._model.defaultStoragePath, defaultName);
-    //         await fse.remove(folderLocation);
-    //         await fse.mkdir(folderLocation);
-    //         await ProcessBuilder.execute(this._outputChannel, item.getServer().getName(), 'jar', { cwd: folderLocation }, 'xvf', `${webappPath}`);
-    //     } else {
-    //         folderLocation = webappPath;
-    //     }
-    //     return appName;
-    // }
-    // /* tsline:enable:no-any */
-
-    // private parseContextPathToFolderName(context: string): string {
-    //     if (context === '/' || context === '') {
-    //         return 'ROOT';
-    //     }
-    //     const replacedSlashes: string = context.replace('/', '#');
-    //     return replacedSlashes.startsWith('#') ? replacedSlashes.substring(1) : replacedSlashes;
     // }
 }

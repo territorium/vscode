@@ -1,17 +1,15 @@
 'use strict';
 
 import * as vscode from "vscode";
-import * as path from "path";
 
 import { TreeItem } from "vscode";
 
-import { Utility } from "../util/Utility";
 import { ProjectModel } from "./ProjectModel";
 import { ProjectNode, FileTreeItem } from "./Project";
+import { Utility } from "../util/Utility";
 
 
 export class ProjectTreeItem extends TreeItem {
-
 
     constructor(private element: ProjectNode, collapsibleState?: vscode.TreeItemCollapsibleState) {
         super(element.getName(), collapsibleState);
@@ -33,6 +31,7 @@ export class ProjectProvider implements vscode.TreeDataProvider<ProjectNode> {
         // this._onDidChangeTreeData.fire();
         _context.subscriptions.push(vscode.commands.registerCommand('tol.openProjectFile', item => this.onClicked(item)));
         _context.subscriptions.push(vscode.commands.registerCommand('tol.refreshProjectView', (_operationId: string, item: ProjectTreeItem) => this.refresh(item)));
+        _context.subscriptions.push(vscode.commands.registerCommand('tol.addEntry', item => vscode.window.showInformationMessage(`Successfully called add entry.`)));
     }
 
     public async getTreeItem(element: ProjectNode): Promise<ProjectTreeItem> {
@@ -42,22 +41,22 @@ export class ProjectProvider implements vscode.TreeDataProvider<ProjectNode> {
 
         switch (element.getType()) {
             case "project":
-                item.iconPath = this.toIconPath('symbol-method.svg');
+                item.iconPath = Utility.toIconPath('symbol-method.svg', this._context);
                 break;
 
             case "model":
-                item.iconPath = this.toIconPath('archive.svg');
+                item.iconPath = Utility.toIconPath('archive.svg', this._context);
                 break;
 
             case "folder":
-                item.iconPath = this.toIconPath('folder.svg');
+                item.iconPath = Utility.toIconPath('folder.svg', this._context);
                 break;
 
             case "file":
                 const title: string = item.label?.toString() ?? "";
                 item.command = { command: 'tol.openProjectFile', title: title, arguments: [element] };
 
-                item.iconPath = this.toIconPath('file.svg');
+                item.iconPath = Utility.toIconPath('file.svg', this._context);
                 break;
         }
 
@@ -73,24 +72,13 @@ export class ProjectProvider implements vscode.TreeDataProvider<ProjectNode> {
     }
 
     public onClicked(item: FileTreeItem) {
-        if (item.file === undefined) {
-            return;
+        if (item.isLeaf()) {
+            Utility.openUri(item.getUri());
         }
 
-        Utility.openFile(item.file);
     }
 
     public dispose(): void {
         this._onDidChangeTreeData.dispose();
-    }
-
-    private toIconPath(file: string): {
-        light: string;
-        dark: string;
-    } {
-        return {
-            dark: this._context.asAbsolutePath(path.join('icons', 'dark', file)),
-            light: this._context.asAbsolutePath(path.join('icons', 'light', file))
-        };
     }
 }

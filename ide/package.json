@@ -1,8 +1,8 @@
 {
-  "name": "ide",
-  "displayName": "TOL IDE",
-  "description": "TOL Development tools for VSCode",
-  "version": "0.2.1",
+  "name": "tol-tools",
+  "displayName": "TOL Server Tools",
+  "description": "TOL server tools for VSCode",
+  "version": "0.2.2",
   "publisher": "TOL",
   "icon": "logo.png",
   "repository": {
@@ -27,12 +27,6 @@
   "main": "./dist/extension.js",
   "contributes": {
     "views": {
-      "explorer": [
-        {
-          "id": "projectExplorer",
-          "name": "smart.IO"
-        }
-      ],
       "debug": [
         {
           "id": "serverExplorer",
@@ -44,15 +38,6 @@
       {
         "command": "tol.refreshServerView",
         "title": "Refresh Servers",
-        "category": "TOL",
-        "icon": {
-          "light": "icons/light/refresh.svg",
-          "dark": "icons/dark/refresh.svg"
-        }
-      },
-      {
-        "command": "tol.refreshProjectView",
-        "title": "Refresh Projects",
         "category": "TOL",
         "icon": {
           "light": "icons/light/refresh.svg",
@@ -145,11 +130,6 @@
           "group": "navigation@0"
         },
         {
-          "command": "tol.refreshProjectView",
-          "when": "view == projectExplorer",
-          "group": "navigation@0"
-        },
-        {
           "command": "server.add",
           "when": "view == serverExplorer",
           "group": "navigation@1"
@@ -158,9 +138,6 @@
       "commandPalette": [
         {
           "command": "tol.refreshServerView"
-        },
-        {
-          "command": "tol.refreshProjectView"
         },
         {
           "command": "server.app",
@@ -316,20 +293,16 @@
   },
   "devDependencies": {
     "@types/vscode": "^1.89.0",
-    "@types/mocha": "^10.0.6",
-    "@types/node": "^20.12.12",
-    "@typescript-eslint/eslint-plugin": "^7.10.0",
-    "@typescript-eslint/parser": "^7.10.0",
+    "@types/node": "^20.14.1",
+    "@typescript-eslint/eslint-plugin": "^7.12.0",
+    "@typescript-eslint/parser": "^7.12.0",
     "typescript": "^5.4.5",
+    "@types/mocha": "^10.0.6",
     "@types/fs-extra": "^11.0.4",
     "@vscode/test-cli": "^0.0.9",
-    "@vscode/test-electron": "^2.3.9",
-    "@types/lodash": "4.17.0"
+    "@vscode/test-electron": "^2.4.0"
   },
   "dependencies": {
-    "lodash": "^4.17.15",
-    "portfinder": "^1.0.13",
-    "fs-extra": "^11.2.0",
-    "readline": "^1.3.0"
+    "fs-extra": "^11.2.0"
   }
 }
