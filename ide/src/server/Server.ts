@@ -139,7 +139,7 @@ export class ServerPlatform extends Server {
         }
 
         if (this.modelLocation) {
-            args.push("-Dsmartio.user=" + this.modelLocation);
+            args.push("-Dsmartio.user=" + this.modelLocation.fsPath);
         }
 
         args.push("--add-opens=java.base/java.lang=ALL-UNNAMED");
@@ -224,7 +224,10 @@ export class ServerOQL extends Server {
     }
 
     public async start(outputChannel: vscode.OutputChannel): Promise<void> {
-        ProcessBuilder.exec(outputChannel, this.getName(), this.getCommand().fsPath, { shell: true });
+        let args: string[] = ["-s", "/data/smartIO/develop/sample/data.ini"];
+        //         let args: string[] = ["-s", "/data/smartIO/develop/sample/timesheet/odb-server.properties", "-l", "/data/smartIO/develop/sample/timesheet/odb-logging.properties"];
+
+        ProcessBuilder.exec(outputChannel, this.getName(), this.getCommand().fsPath, { shell: true }, ...args);
         this.setStarted(true);
         return new Promise<void>(() => { });
         // const p = ProcessBuilder.exec(outputChannel, this.getName(), this.getCommand(), { shell: true });

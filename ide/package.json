@@ -6,7 +6,6 @@
   "publisher": "TOL",
   "icon": "logo.png",
   "repository": {
-    "type": "git",
     "url": "https://github.com/territorium/vscode.git"
   },
   "license": "MIT",
@@ -35,6 +34,22 @@
       ]
     },
     "commands": [
+      {
+        "command": "LogServer.start",
+        "title": "Start Log Server"
+      },
+      {
+        "command": "LogServer.stop",
+        "title": "Stop Log Server"
+      },
+      {
+        "command": "LogServer.toggle",
+        "title": "Pause/Resume Log Server Listening"
+      },
+      {
+        "command": "LogServer.clear",
+        "title": "Clear Log Server Output Channel"
+      },
       {
         "command": "tol.refreshServerView",
         "title": "Refresh Servers",
@@ -231,28 +246,28 @@
     "configuration": [
       {
         "id": "tol-web-extension",
-        "title": "smart.IO Configuration",
+        "title": "TOL Tools",
         "order": 22,
         "properties": {
-          "smartio.chrome": {
+          "LogServer.host": {
+            "type": "string",
+            "default": "localhost",
+            "description": "The host address of the server."
+          },
+          "LogServer.port": {
+            "type": "number",
+            "default": 7755,
+            "description": "The UDP port the server listens on."
+          },
+          "V8Debug.bin": {
             "type": "string",
             "default": "/opt/google/chrome/chrome",
             "description": "Chrome location"
           },
-          "smartio.chromePort": {
+          "V8Debug.port": {
             "type": "integer",
             "default": 9222,
             "description": "Chrome debugger port"
-          },
-          "smartio.workspace": {
-            "type": "string",
-            "default": "",
-            "description": "Platform workspace."
-          },
-          "smartio.restart_when_change": {
-            "type": "boolean",
-            "default": false,
-            "description": "Restart Platform Server when project changes"
           },
           "smartio.customEnv": {
             "type": "array",
@@ -276,10 +291,98 @@
               }
             },
             "default": [],
-            "description": "Specifies an array of environment variable names and values. These environment variable values will be passed when tomcat starts.",
+            "description": "Specifies an array of environment variable names and values.",
             "scope": "window"
           }
         }
+      }
+    ],
+    "configurationDefaults": {
+      "editor.tokenColorCustomizations": {
+        "textMateRules": [
+          {
+            "name": "syslog-proc",
+            "scope": "syslog-proc",
+            "settings": {
+              "foreground": "#555"
+            }
+          },
+          {
+            "name": "syslog-level.FATAL",
+            "scope": "syslog-level.FATAL",
+            "settings": {
+              "fontStyle": "bold",
+              "foreground": "#a00"
+            }
+          },
+          {
+            "name": "syslog-level.ERROR",
+            "scope": "syslog-level.ERROR",
+            "settings": {
+              "fontStyle": "bold",
+              "foreground": "#a00"
+            }
+          },
+          {
+            "name": "syslog-level.WARN",
+            "scope": "syslog-level.WARN",
+            "settings": {
+              "fontStyle": "bold",
+              "foreground": "#bb0"
+            }
+          },
+          {
+            "name": "syslog-level.INFO",
+            "scope": "syslog-level.INFO",
+            "settings": {
+              "fontStyle": "bold",
+              "foreground": "#55f"
+            }
+          },
+          {
+            "name": "syslog-level.CONFIG",
+            "scope": "syslog-level.CONFIG",
+            "settings": {
+              "fontStyle": "bold underline",
+              "foreground": "#55f"
+            }
+          },
+          {
+            "name": "syslog-level.DEBUG",
+            "scope": "syslog-level.SUCCESS",
+            "settings": {
+              "fontStyle": "bold",
+              "foreground": "#000"
+            }
+          },
+          {
+            "name": "syslog-level.TRACE",
+            "scope": "syslog-level.TRACE",
+            "settings": {
+              "fontStyle": "bold",
+              "foreground": "#000"
+            }
+          }
+        ]
+      }
+    },
+    "languages": [
+      {
+        "id": "SYSLOG",
+        "extensions": [
+          ".log"
+        ],
+        "icon": {
+          "dark": "icon.png",
+          "light": "icon.png"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "SYSLOG",
+        "scopeName": "source.output",
+        "path": "./log.tmlanguage.json"
       }
     ]
   },
@@ -292,15 +395,15 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.89.0",
-    "@types/node": "^20.14.1",
-    "@typescript-eslint/eslint-plugin": "^7.12.0",
-    "@typescript-eslint/parser": "^7.12.0",
-    "typescript": "^5.4.5",
+    "@types/vscode": "^1.90.0",
+    "@types/node": "^20.14.2",
+    "@typescript-eslint/eslint-plugin": "^7.13.0",
+    "@typescript-eslint/parser": "^7.13.0",
     "@types/mocha": "^10.0.6",
     "@types/fs-extra": "^11.0.4",
     "@vscode/test-cli": "^0.0.9",
-    "@vscode/test-electron": "^2.4.0"
+    "@vscode/test-electron": "^2.4.0",
+    "typescript": "^5.4.5"
   },
   "dependencies": {
     "fs-extra": "^11.2.0"

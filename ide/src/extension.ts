@@ -1,13 +1,17 @@
 'use strict';
 
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 
 import { ServerModel } from "./server/ServerModel";
 import { ServerController } from "./server/ServerController";
 import { ServerTreeProvider, ServerTreeItem } from "./server/ServerTreeProvider";
 
+
+
+import { LogServer } from './util/logger';
+import { UdpLogServer } from './util/logger_udp';
+
+const logger: LogServer = new UdpLogServer();
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -37,4 +41,19 @@ export function activate(context: vscode.ExtensionContext) {
 	// vscode.commands.registerCommand('chrome.debug', () => {
 	// 	ProcessBuilder.execute2("/opt/google/chrome/chrome",{ shell: true }, "--remote-debugging-port=9222", "--user-data-dir=/home/brigl/.local/share/TOL/devtools/chrome-tmp", "--headless", "--disable-gpu");
 	// });
+
+	context.subscriptions.push(vscode.commands.registerCommand('LogServer.start', () => { logger.start(); }));
+	context.subscriptions.push(vscode.commands.registerCommand('LogServer.stop', () => { logger.stop(); }));
+	context.subscriptions.push(vscode.commands.registerCommand('LogServer.toggle', () => { logger.toggle(); }));
+	context.subscriptions.push(vscode.commands.registerCommand('LogServer.clear', () => { logger.clear(); }));
+	context.subscriptions.push(logger.statusBarItem);
+
+	vscode.workspace.onDidChangeConfiguration((event) => {
+		if (event.affectsConfiguration('LogServer')) {
+
+			if (!logger.enabled) {
+				logger.updateStatusBarTooltip();
+			}
+		}
+	});
 }

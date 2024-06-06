@@ -6,6 +6,7 @@ import * as fs from "fs";
 
 import { MessageItem } from "vscode";
 
+import { Defaults } from '../default';
 import { DialogMessage } from '../util/DialogMessage';
 
 import { ServerModel } from "./ServerModel";
@@ -17,7 +18,7 @@ export class ServerController {
     private _outputChannel: vscode.OutputChannel;
 
     constructor(private _model: ServerModel, private _context: vscode.ExtensionContext) {
-        this._outputChannel = vscode.window.createOutputChannel('vscode-tol');
+        this._outputChannel = vscode.window.createOutputChannel('vscode-tol', Defaults.LOG_FORMATTER);
     }
 
     async validateInstallPath(installPath: vscode.Uri): Promise<boolean> {
