@@ -1,0 +1,76 @@
+{
+    "scopeName": "source.output",
+    "name": "SYSLOG",
+    "patterns": [
+        {
+            "name": "tol.level.fatal",
+            "match": "(\\[.+\\]\\:\\s*)?[^|]+\\|\\s*FATAL.*"
+        },
+        {
+            "name": "tol.level.error",
+            "match": "(\\[.+\\]\\:\\s*)?[^|]+\\|\\s*ERROR.*"
+        },
+        {
+            "name": "tol.level.warn",
+            "match": "(\\[.+\\]\\:\\s*)?[^|]+\\|\\s*WARN.*"
+        },
+        {
+            "name": "tol.level.info",
+            "match": "(\\[.+\\]\\:\\s*)?[^|]+\\|\\s*INFO.*"
+        },
+        {
+            "name": "tol.level.config",
+            "match": "(\\[.+\\]\\:\\s*)?[^|]+\\|\\s*CONFIG.*"
+        },
+        {
+            "name": "tol.level.debug",
+            "match": "(\\[.+\\]\\:\\s*)?[^|]+\\|\\s*DEBUG.*"
+        },
+        {
+            "name": "tol.level.trace",
+            "match": "(\\[.+\\]\\:\\s*)?[^|]+\\|\\s*TRACE.*"
+        },
+        {
+            "name": "syslog.log",
+            "match": "(\\[.+\\]\\:\\s*)?[^|]+\\|\\s*(FATAL|ERROR|WARN|INFO|CONFIG|DEBUG|TRACE).*",
+            "captures": {
+                "1": {
+                    "name": "syslog-proc"
+                },
+                "2": {
+                    "name": "tol.level",
+                    "patterns": [
+                        {
+                            "match": "FATAL",
+                            "name": "tol.level.fatal"
+                        },
+                        {
+                            "match": "ERROR",
+                            "name": "tol.level.error"
+                        },
+                        {
+                            "match": "WARN",
+                            "name": "tol.level.warn"
+                        },
+                        {
+                            "match": "INFO",
+                            "name": "tol.level.info"
+                        },
+                        {
+                            "match": "CONFIG",
+                            "name": "tol.level.config"
+                        },
+                        {
+                            "match": "DEBUG",
+                            "name": "tol.level.debug"
+                        },
+                        {
+                            "match": "TRACE",
+                            "name": "tol.level.trace"
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}

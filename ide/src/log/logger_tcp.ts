@@ -30,17 +30,15 @@ export class TcpLogServer extends LogServer {
 	}
 
 	protected connect(port: number, host: string) {
-		this.server.listen(port, host, () => {
-			this.onConnected(`The Remote Log Server Started: ${JSON.stringify(this.server.address())}`);
-		}).once('error', (error: any) => {
-			// Failed to monitor
-			vscode.window.showErrorMessage(`Failed to start the Remote Log Server: ${error.message}`);
-			this.server.removeAllListeners("error").removeAllListeners("listening");
-		});
+		this.server.listen(port, host, () =>
+			this.onConnected(this.server.address())).once('error', (error: any) => this.onError(error));
+	}
+
+	protected releaseListeners() {
+		this.server.removeAllListeners("error").removeAllListeners("listening");
 	}
 
 	protected disconnect() {
 		this.server.close();
-		this.server.removeAllListeners("error").removeAllListeners("listening");
 	}
 }

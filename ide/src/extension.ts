@@ -8,8 +8,8 @@ import { ServerTreeProvider, ServerTreeItem } from "./server/ServerTreeProvider"
 
 
 
-import { LogServer } from './util/logger';
-import { UdpLogServer } from './util/logger_udp';
+import { LogServer } from './log/logger';
+import { UdpLogServer } from './log/logger_udp';
 
 const logger: LogServer = new UdpLogServer();
 
@@ -37,15 +37,17 @@ export function activate(context: vscode.ExtensionContext) {
 	vscode.commands.registerCommand('server.admin', (item: ServerTreeItem) => controller.openExternal(item.getServer(), "http://localhost:8088"));
 
 	vscode.commands.registerCommand('server.model', (item: ServerTreeItem) => controller.selectModel(item.getServer()));
+	vscode.commands.registerCommand('server.model.remove', (item: ServerTreeItem) => controller.removeModel(item.getServer()));
 
-	// vscode.commands.registerCommand('chrome.debug', () => {
-	// 	ProcessBuilder.execute2("/opt/google/chrome/chrome",{ shell: true }, "--remote-debugging-port=9222", "--user-data-dir=/home/brigl/.local/share/TOL/devtools/chrome-tmp", "--headless", "--disable-gpu");
-	// });
+	vscode.commands.registerCommand('chrome.debug', () => {
+		vscode.env.openExternal(vscode.Uri.parse("devtools://devtools/bundled/inspector.html?experiments=true&v8only=true&ws=127.0.0.1:9015"));
+		// ProcessBuilder.execute2("/opt/google/chrome/chrome",{ shell: true }, "--remote-debugging-port=9222", "--user-data-dir=/home/brigl/.local/share/TOL/devtools/chrome-tmp", "--headless", "--disable-gpu");
+	});
 
-	context.subscriptions.push(vscode.commands.registerCommand('LogServer.start', () => { logger.start(); }));
-	context.subscriptions.push(vscode.commands.registerCommand('LogServer.stop', () => { logger.stop(); }));
-	context.subscriptions.push(vscode.commands.registerCommand('LogServer.toggle', () => { logger.toggle(); }));
-	context.subscriptions.push(vscode.commands.registerCommand('LogServer.clear', () => { logger.clear(); }));
+	context.subscriptions.push(vscode.commands.registerCommand('TolTelemetry.start', () => { logger.start(); }));
+	context.subscriptions.push(vscode.commands.registerCommand('TolTelemetry.stop', () => { logger.stop(); }));
+	context.subscriptions.push(vscode.commands.registerCommand('TolTelemetry.toggle', () => { logger.toggle(); }));
+	context.subscriptions.push(vscode.commands.registerCommand('TolTelemetry.clear', () => { logger.clear(); }));
 	context.subscriptions.push(logger.statusBarItem);
 
 	vscode.workspace.onDidChangeConfiguration((event) => {

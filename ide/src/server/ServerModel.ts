@@ -6,7 +6,7 @@ import * as fs from "fs";
 
 import { Workspace } from "../util/Workspace";
 
-import { Server, ServerPlatform, ServerOQL, IS_WINDOWS, DEBUG_SESSION_NAME } from "./Server";
+import { Server, newInstance, IS_WINDOWS, DEBUG_SESSION_NAME } from "./Server";
 
 
 class ModelConfig {
@@ -22,15 +22,12 @@ class ModelConfig {
         this._installPath = s.getInstallPath().fsPath;
         this._storagePath = s.getStoragePath().fsPath;
         this._type = s.getType();
-        this._model = s.modelLocation?.fsPath;
+        this._model = s.getUserDir()?.fsPath;
     }
 
-    public static create(config: ModelConfig, context: vscode.ExtensionContext): Server {
-        if (config._type === "server") {
-            return new ServerOQL(config._name, vscode.Uri.parse(config._installPath), vscode.Uri.parse(config._storagePath));
-        }
-        const location = config._model ? vscode.Uri.parse(config._model) : undefined;
-        return new ServerPlatform(config._name, vscode.Uri.parse(config._installPath), vscode.Uri.parse(config._storagePath), context.extensionUri, location);
+    public static create(config: ModelConfig): Server {
+        const userDir = config._model ? vscode.Uri.parse(config._model) : undefined;
+        return newInstance(config._name, config._type, vscode.Uri.parse(config._installPath), vscode.Uri.parse(config._storagePath), userDir);
     }
 }
 
@@ -54,8 +51,12 @@ export class ServerModel {
         return this._serverList;
     }
 
-    public setModelPath(server: Server, location: vscode.Uri) {
-        (<ServerPlatform>server).setModel(location);
+    public dispose() {
+        this._serverList.forEach(s => s.dispose());
+    }
+
+    public setModelPath(server: Server, userDir?: vscode.Uri) {
+        server.setUserDir(userDir);
         this.saveServerListSync();
         vscode.commands.executeCommand('tol.refreshServerView');
     }
@@ -91,16 +92,16 @@ export class ServerModel {
         Workspace.removeDir(storagePath);
 
         if (fs.existsSync(vscode.Uri.joinPath(installPath, "bin", "smartIO" + (IS_WINDOWS ? '.exe' : '')).fsPath)) {
-            this.addServer(new ServerPlatform(serverName + " Platform", installPath, storagePath, this.context.extensionUri));
+            this.addServer(newInstance(serverName, "platform", installPath, storagePath));
         }
 
         if (fs.existsSync(vscode.Uri.joinPath(installPath, "bin", "smartIO-odb" + (IS_WINDOWS ? '.exe' : '')).fsPath)) {
-            this.addServer(new ServerOQL(serverName + " Server", installPath, storagePath));
+            this.addServer(newInstance(serverName, "server", installPath, storagePath));
         }
     }
 
     public addServer(server: Server): void {
-        const index: number = this._serverList.findIndex((item: Server) => item.getName() === server.getName());
+        const index: number = this._serverList.findIndex((item: Server) => item.getName() === server.getTitle());
         if (index > -1) {
             this._serverList.splice(index, 1);
         }
@@ -112,7 +113,7 @@ export class ServerModel {
 
     private loadServerList(): void {
         const config = vscode.Uri.joinPath(this.uri, 'servers.json');
-        this._serverList = Workspace.loadList(config.fsPath).map(o => ModelConfig.create(o, this.context));
+        this._serverList = Workspace.loadList(config.fsPath).map(o => ModelConfig.create(o));
     }
 
     public saveServerListSync(): void {

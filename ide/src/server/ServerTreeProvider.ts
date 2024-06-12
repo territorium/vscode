@@ -6,6 +6,7 @@ import * as path from "path";
 import { TreeItem } from "vscode";
 
 import { Utility } from "../util/Utility";
+import { Defaults } from "../default";
 import { ServerModel } from "./ServerModel";
 import { Server, ServerState } from "./Server";
 
@@ -13,7 +14,7 @@ import { Server, ServerState } from "./Server";
 export class ServerTreeItem extends vscode.TreeItem {
 
     constructor(private server: Server) {
-        super(server.getName());
+        super(server.getTitle());
     }
 
     public getServer(): Server {
@@ -38,7 +39,7 @@ export class ServerTreeProvider implements vscode.TreeDataProvider<TreeItem> {
     }
 
     public resolveTreeItem?(item: TreeItem, element: TreeItem, token: vscode.CancellationToken): vscode.ProviderResult<TreeItem> {
-        if (element.contextValue === "toml" || element.contextValue === "jvm") {
+        if (element.contextValue === Defaults.TYPE_INI || element.contextValue === Defaults.TYPE_JVM) {
             const title: string = element.label?.toString() ?? "";
             element.command = { command: 'tol.openServerFile', title: title, arguments: [element] };
         }
@@ -63,19 +64,15 @@ export class ServerTreeProvider implements vscode.TreeDataProvider<TreeItem> {
         const children: TreeItem[] = [];
         switch (element.contextValue) {
             case "model": const model = <ServerTreeItem>element;
-                const location = model.getServer().modelLocation;
+                const location = model.getServer().getUserDir();
                 if (location) {
-                    let node = new TreeItem(vscode.Uri.joinPath(location, 'server.properties'));
-                    node.label = "Server configuration";
-                    node.contextValue = "toml";
-                    node.iconPath = Utility.toIconPath('settings-gear.svg', this._context);
-                    children.push(node);
-
-                    node = new TreeItem(vscode.Uri.joinPath(location, 'context.properties'));
-                    node.label = "Context configuration";
-                    node.contextValue = "toml";
-                    node.iconPath = Utility.toIconPath('settings-gear.svg', this._context);
-                    children.push(node);
+                    model.getServer().getUserFiles().forEach(i => {
+                        const node = new TreeItem(i);
+                        node.label = path.basename(i.fsPath);
+                        node.contextValue = Defaults.TYPE_INI;
+                        node.iconPath = Utility.toIconPath('settings-gear.svg', this._context);
+                        children.push(node);
+                    });
                 }
                 break;
 
@@ -83,25 +80,25 @@ export class ServerTreeProvider implements vscode.TreeDataProvider<TreeItem> {
             case ServerState.RunningServer:
                 const server: Server = (<ServerTreeItem>element).getServer();
                 server.getFiles().forEach(i => {
-                    const node = new TreeItem(vscode.Uri.parse(i[1]));
-                    node.label = path.basename(i[0]);
-                    node.contextValue = "toml";
+                    const node = new TreeItem(i);
+                    node.label = path.basename(i.fsPath);
+                    node.contextValue = Defaults.TYPE_INI;
                     node.iconPath = Utility.toIconPath('settings-gear.svg', this._context);
 
-                    if (i[1].endsWith("jvm.options")) {
-                        node.contextValue = "jvm";
-                        node.iconPath = Utility.toIconPath('settings.svg', this._context);
+                    if (i.fsPath.endsWith("jvm.options")) {
+                        node.contextValue = Defaults.TYPE_JVM;
+                        node.iconPath = Utility.toIconPath('symbol-namespace.svg', this._context);
                     }
 
                     children.push(node);
                 });
 
-                if (server.getType() === "platform") {
+                if (server.getUserFiles().length && (server.getType() === "platform" || server.getType() === "server")) {
                     const node = new ServerTreeItem(server);
-                    node.label = server.modelLocation ? path.basename(server.modelLocation.fsPath) : "<Select Model>";
+                    node.label = path.basename(server.getUserDir()?.fsPath || "");
                     node.contextValue = "model";
-                    node.iconPath = Utility.toIconPath('archive.svg', this._context);
-                    node.collapsibleState = server.modelLocation ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None;
+                    node.iconPath = Utility.toIconPath('package.svg', this._context);
+                    node.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
                     children.push(node);
                 }
                 break;
@@ -114,7 +111,7 @@ export class ServerTreeProvider implements vscode.TreeDataProvider<TreeItem> {
             return;
         }
 
-        if (item.contextValue === "jvm" || item.contextValue === "toml") {
+        if (item.contextValue === Defaults.TYPE_JVM || item.contextValue === Defaults.TYPE_INI) {
             Utility.openUri(item.resourceUri);
         }
     }

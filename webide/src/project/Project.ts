@@ -8,17 +8,27 @@ import { INI, Parameter, Utility } from "../util/Utility";
 
 const FILTER: RegExp = new RegExp("^[^\.]+\.(ui\.xml|xml|properties|js)$", "i");
 
+function doFilter(name: string, type: vscode.FileType): boolean {
+    return type === vscode.FileType.Directory || FILTER.test(name);
+}
+
+export enum ElementType {
+    PROJECT = 0,
+    MODEL = 1,
+    FOLDER = 2,
+    FILE = 64
+}
 
 export class ProjectNode {
 
-    constructor(private name: string, private type: string, protected uri: vscode.Uri) {
+    constructor(private name: string, private type: ElementType, protected uri: vscode.Uri) {
     }
 
     public getName(): string {
         return this.name;
     }
 
-    public getType(): string {
+    public getType(): ElementType {
         return this.type;
     }
 
@@ -35,7 +45,7 @@ export class ProjectNode {
 export class Project extends ProjectNode {
 
     constructor(private folder: vscode.WorkspaceFolder) {
-        super(folder.name, "project", folder.uri);
+        super(folder.name, ElementType.PROJECT, folder.uri);
         const uri2 = vscode.Uri.joinPath(folder.uri, "smartIO");
         vscode.workspace.fs.stat(vscode.Uri.joinPath(uri2, "context.properties")).then(() => this.uri = uri2);
 
@@ -60,7 +70,7 @@ export class Project extends ProjectNode {
 
 abstract class AbstractProjectNode extends ProjectNode {
 
-    constructor(name: string, type: string, uri: vscode.Uri) {
+    constructor(name: string, type: ElementType, uri: vscode.Uri) {
         super(name, type, uri);
         this.uri = uri;
     }
@@ -69,7 +79,7 @@ abstract class AbstractProjectNode extends ProjectNode {
         const children: FileTreeItem[] = [];
         try {
             const array = await vscode.workspace.fs.readDirectory(this.uri);
-            array.filter((value, index, array) => FILTER.test(value[0])).forEach((value, index, array) => {
+            array.filter((value, index, array) => doFilter(value[0], value[1])).forEach((value, index, array) => {
                 children.push(new FileTreeItem(vscode.Uri.joinPath(this.uri, value[0])));
             });
 
@@ -91,7 +101,7 @@ export class ModelTreeItem extends AbstractProjectNode {
     private lines: string[] = [];
 
     constructor(name: string, uri: vscode.Uri, private parameter: Parameter) {
-        super(name, "model", vscode.Uri.joinPath(uri, parameter["path"] ?? name));
+        super(name, ElementType.MODEL, vscode.Uri.joinPath(uri, parameter["path"] ?? name));
         const uri2 = vscode.Uri.joinPath(this.uri, "modules.txt");
         vscode.workspace.fs.stat(uri2).then(() => Utility.readLines(uri2, this.lines));
     }
@@ -100,7 +110,7 @@ export class ModelTreeItem extends AbstractProjectNode {
         const children: FileTreeItem[] = [];
         try {
             const array = await vscode.workspace.fs.readDirectory(this.uri);
-            array.filter((value, index, array) => FILTER.test(value[0])).forEach((value, index, array) => {
+            array.filter((value, index, array) => doFilter(value[0], value[1])).forEach((value, index, array) => {
                 children.push(new FileTreeItem(vscode.Uri.joinPath(this.uri, value[0])));
             });
             const uri = vscode.Uri.joinPath(this.uri, "..", "..", "smartio-config", "fm");
@@ -124,11 +134,11 @@ export class FileTreeItem extends AbstractProjectNode {
     public filename: string;
 
     constructor(uri: vscode.Uri) {
-        super(path.basename(uri.fsPath), path.basename(uri.fsPath).indexOf(".") < 0 ? "folder" : "file", uri);
+        super(path.basename(uri.fsPath), path.basename(uri.fsPath).indexOf(".") < 0 ? ElementType.FOLDER : ElementType.FILE, uri);
         this.filename = path.basename(uri.fsPath);
     }
 
     public isLeaf(): boolean {
-        return this.getType() !== "folder";
+        return this.getType() !== ElementType.FOLDER;
     }
 }
