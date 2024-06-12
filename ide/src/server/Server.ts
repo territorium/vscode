@@ -4,11 +4,12 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
 
-import { Utility } from "../util/Utility";
+
+import { Defaults } from '../default';
 import { ProcessBuilder } from "../util/ProcessBuilder";
+import { ChildProcess } from "child_process";
 
 
-export const JVM_OPTION_FILE = 'jvm.options';
 export const JVM_OPTION_DEBUG = '-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=';
 export const JAVA_IO_TEMP_DIR_KEY = '-Djava.io.tmpdir';
 export const ENCODING = '-Dfile.encoding=UTF8';
@@ -21,21 +22,27 @@ export enum ServerState {
     IdleServer = 'idleserver'
 }
 
-
 export abstract class Server {
 
+
     private _state: ServerState = ServerState.IdleServer;
-
-
-    public modelLocation: vscode.Uri | undefined;
+    private _outputChannel: vscode.OutputChannel;
 
     private _debugPort: number;
 
-    constructor(private _name: string, private _installPath: vscode.Uri, private _storagePath: vscode.Uri) {
+    constructor(private _name: string, private _installPath: vscode.Uri, private _storagePath: vscode.Uri, private _userDir: vscode.Uri | undefined) {
         this._debugPort = 0;
+        this._outputChannel = vscode.window.createOutputChannel(this.getTitle(), Defaults.LOG_FORMATTER);
     }
 
+    protected channel(): vscode.OutputChannel {
+        return this._outputChannel;
+    }
     public getName(): string {
+        return this._name;
+    }
+
+    public getTitle(): string {
         return this._name;
     }
 
@@ -78,43 +85,45 @@ export abstract class Server {
         return this._storagePath;
     }
 
+    public getUserDir(): vscode.Uri | undefined {
+        return this._userDir;
+    }
+
     public abstract getConfigPath(): vscode.Uri;
 
-    public abstract getFiles(): string[][];
+    public abstract getFiles(): vscode.Uri[];
+
+    public abstract getUserFiles(): vscode.Uri[];
 
     public abstract getDebugConfiguration(): vscode.DebugConfiguration | null;
 
-    public abstract start(outputChannel: vscode.OutputChannel): Promise<void>;
+    public abstract start(): Promise<void>;
 
-    public abstract stop(outputChannel: vscode.OutputChannel): Promise<void>;
+    public abstract stop(): Promise<void>;
+
+    public setUserDir(userDir?: vscode.Uri) {
+        this._userDir = userDir;
+    }
+
+    public dispose(): void {
+        this._outputChannel.dispose();
+    }
 }
 
 
 
 export class ServerPlatform extends Server {
 
-    private jvmOptionFile: vscode.Uri;
-
-    constructor(_name: string, _installPath: vscode.Uri, _storagePath: vscode.Uri, extensionUri: vscode.Uri, _location?: vscode.Uri) {
-        super(_name, _installPath, _storagePath);
-        this.modelLocation = _location;
-        this.jvmOptionFile = vscode.Uri.joinPath(_storagePath, JVM_OPTION_FILE);
-
-        if (!fs.existsSync(this.jvmOptionFile.fsPath)) {
-            const filename = vscode.Uri.joinPath(extensionUri, 'resources', JVM_OPTION_FILE).fsPath;
-            try {
-                if (!fs.existsSync(_storagePath.fsPath)) {
-                    fs.mkdirSync(_storagePath.fsPath);
-                }
-                fs.copyFileSync(filename, this.jvmOptionFile.fsPath);
-            } catch (t) {
-                console.log(t);
-            }
-        }
+    constructor(_name: string, installPath: vscode.Uri, storagePath: vscode.Uri, userDir?: vscode.Uri) {
+        super(_name, installPath, storagePath, userDir);
     }
 
     public getType(): string {
         return "platform";
+    }
+
+    public getTitle(): string {
+        return this.getName() + " Platform";
     }
 
     public getConfigPath(): vscode.Uri {
@@ -127,10 +136,6 @@ export class ServerPlatform extends Server {
 
     public async getArguments(command: string): Promise<string[]> {
         let args = ["-Xms1024m", "-Xmx4096m"];
-        if (fs.existsSync(this.jvmOptionFile.fsPath)) {
-            args = [];
-            await Utility.readLines(this.jvmOptionFile, args);
-        }
 
         args.push("-Dhttps.protocols=TLSv1,TLSv1.1,TLSv1.2");
 
@@ -138,8 +143,8 @@ export class ServerPlatform extends Server {
             args.push(JVM_OPTION_DEBUG + this.getDebugPort());
         }
 
-        if (this.modelLocation) {
-            args.push("-Dsmartio.user=" + this.modelLocation.fsPath);
+        if (this.getUserDir() && fs.existsSync(this.getUserDir()?.fsPath || "")) {
+            args.push("-Dsmartio.user=" + this.getUserDir()?.fsPath);
         }
 
         args.push("--add-opens=java.base/java.lang=ALL-UNNAMED");
@@ -166,29 +171,53 @@ export class ServerPlatform extends Server {
         return config;
     }
 
-    public getFiles(): string[][] {
-        return [
-            ["Server configuration", this.getConfigPath().fsPath],
-            ["Logging configuration", path.join(this.getInstallPath().fsPath, 'conf', 'logging.properties')],
-            ["Worker configuration", path.join(this.getInstallPath().fsPath, 'conf', 'worker.properties')],
-            ["JVM Options", this.jvmOptionFile.fsPath]
-        ];
+    public getFiles(): vscode.Uri[] {
+        let files: vscode.Uri[] = [];
+        if (fs.existsSync(this.getConfigPath().fsPath)) {
+            files.push(this.getConfigPath());
+        }
+
+        let path = vscode.Uri.joinPath(this.getInstallPath(), 'conf', 'logging.properties');
+        if (fs.existsSync(path.fsPath)) {
+            files.push(path);
+        }
+
+        path = vscode.Uri.joinPath(this.getInstallPath(), 'conf', 'worker.properties');
+        if (fs.existsSync(path.fsPath)) {
+            files.push(path);
+        }
+
+        return files;
     }
 
-    public setModel(location: vscode.Uri) {
-        this.modelLocation = location;
+    public getUserFiles(): vscode.Uri[] {
+        let files: vscode.Uri[] = [];
+        if (this.getUserDir()) {
+            const userDir = this.getUserDir() || this.getConfigPath();
+            const confServer = vscode.Uri.joinPath(userDir, 'server.properties');
+            const confProject = vscode.Uri.joinPath(userDir, 'context.properties');
+
+            if (fs.existsSync(confServer.fsPath)) {
+                files.push(confServer);
+            }
+
+            if (fs.existsSync(confProject.fsPath)) {
+                files.push(confProject);
+            }
+        }
+        return files;
     }
 
-    public async start(outputChannel: vscode.OutputChannel): Promise<void> {
+    public async start(): Promise<void> {
         let args: string[] = await this.getArguments('start');
-        const process: Promise<void> = ProcessBuilder.execute(outputChannel, this.getName(), this.getCommand().fsPath, { shell: true }, ...args);
+        const process: Promise<void> = ProcessBuilder.execute(this.channel(), this.getName(), this.getCommand().fsPath, { shell: true }, ...args);
         this.setStarted(true);
         return process;
     }
 
-    public async stop(outputChannel: vscode.OutputChannel): Promise<void> {
+    public async stop(): Promise<void> {
         let args: string[] = await this.getArguments('stop');
-        return ProcessBuilder.execute(outputChannel, this.getName(), this.getCommand().fsPath, { shell: true }, ...args);
+        return ProcessBuilder.execute(this.channel(), this.getName(), this.getCommand().fsPath, { shell: true }, ...args);
     }
 }
 
@@ -196,12 +225,15 @@ export class ServerPlatform extends Server {
 
 export class ServerOQL extends Server {
 
-    constructor(_name: string, _installPath: vscode.Uri, _storagePath: vscode.Uri) {
-        super(_name, _installPath, _storagePath);
+    constructor(_name: string, installPath: vscode.Uri, storagePath: vscode.Uri, userDir: vscode.Uri | undefined) {
+        super(_name, installPath, storagePath, userDir);
     }
 
     public getType(): string {
         return "server";
+    }
+    public getTitle(): string {
+        return this.getName() + " Server";
     }
 
     public getConfigPath(): vscode.Uri {
@@ -212,26 +244,144 @@ export class ServerOQL extends Server {
         return vscode.Uri.joinPath(this.getInstallPath(), 'bin', 'smartIO-odb' + (IS_WINDOWS ? '.bat' : '.sh'));
     }
 
-    public getFiles(): string[][] {
-        return [
-            ["Server configuration", this.getConfigPath().fsPath],
-            ["Logging configuration", path.join(this.getInstallPath().fsPath, 'conf', 'odb-logging.properties')]
-        ];
+    public getFiles(): vscode.Uri[] {
+        let files: vscode.Uri[] = [];
+        if (fs.existsSync(this.getConfigPath().fsPath)) {
+            files.push(this.getConfigPath());
+        }
+
+        let path = vscode.Uri.joinPath(this.getInstallPath(), 'conf', 'odb-logging.properties');
+        if (fs.existsSync(path.fsPath)) {
+            files.push(path);
+        }
+        return files;
+    }
+
+    public getUserFiles(): vscode.Uri[] {
+        let files: vscode.Uri[] = [];
+        if (this.getUserDir()) {
+            const userDir = this.getUserDir() || this.getConfigPath();
+            const confServer = vscode.Uri.joinPath(userDir, 'odb-server.properties');
+            const confLogging = vscode.Uri.joinPath(userDir, 'odb-logging.properties');
+
+            if (fs.existsSync(confServer.fsPath)) {
+                files.push(confServer);
+            }
+
+            if (fs.existsSync(confLogging.fsPath)) {
+                files.push(confLogging);
+            }
+        }
+        return files;
     }
 
     public getDebugConfiguration(): null {
         return null;
     }
 
-    public async start(outputChannel: vscode.OutputChannel): Promise<void> {
-        let args: string[] = ["-s", "/data/smartIO/develop/sample/data.ini"];
-        //         let args: string[] = ["-s", "/data/smartIO/develop/sample/timesheet/odb-server.properties", "-l", "/data/smartIO/develop/sample/timesheet/odb-logging.properties"];
+    public async start(): Promise<void> {
+        let args: string[] = [];
+        this.getUserFiles().forEach(f => {
+            switch (path.basename(f.fsPath)) {
+                case "odb-server.properties":
+                    args.push("-s", f.fsPath);
+                    break;
 
-        ProcessBuilder.exec(outputChannel, this.getName(), this.getCommand().fsPath, { shell: true }, ...args);
+                case "odb-logging.properties":
+                    args.push("-l", f.fsPath);
+                    break;
+            }
+        });
+
+        ProcessBuilder.exec(this.channel(), this.getName(), this.getCommand().fsPath, { shell: true }, ...args);
         this.setStarted(true);
         return new Promise<void>(() => { });
-        // const p = ProcessBuilder.exec(outputChannel, this.getName(), this.getCommand(), { shell: true });
-        // this.setStarted(true);
+    }
+
+    public async stop(): Promise<void> {
+        ProcessBuilder.exec(this.channel(), this.getName(), this.getCommand().fsPath, { shell: true }, '-t');
+        this.setStarted(false);
+        return new Promise<void>(() => { });
+    }
+}
+
+
+
+export class ServerCLI extends Server {
+
+    private _process?: ChildProcess;
+
+    constructor(_name: string, installPath: vscode.Uri, storagePath: vscode.Uri, userDir: vscode.Uri | undefined) {
+        super(_name, installPath, storagePath, userDir);
+    }
+
+    public getType(): string {
+        return "cli";
+    }
+    public getTitle(): string {
+        return this.getName() + " CLI";
+    }
+
+    public getConfigPath(): vscode.Uri {
+        return vscode.Uri.joinPath(this.getInstallPath(), 'conf', 'odb-server.properties');
+    }
+
+    public getCommand(): vscode.Uri {
+        return vscode.Uri.joinPath(this.getInstallPath(), 'bin', 'smartio-cli' + (IS_WINDOWS ? '.bat' : '.sh'));
+    }
+
+    public getFiles(): vscode.Uri[] {
+        let files: vscode.Uri[] = [];
+        if (fs.existsSync(this.getConfigPath().fsPath)) {
+            files.push(this.getConfigPath());
+        }
+
+        let path = vscode.Uri.joinPath(this.getInstallPath(), 'conf', 'odb-logging.properties');
+        if (fs.existsSync(path.fsPath)) {
+            files.push(path);
+        }
+        return files;
+    }
+
+    public getUserFiles(): vscode.Uri[] {
+        let files: vscode.Uri[] = [];
+        if (this.getUserDir()) {
+            const userDir = this.getUserDir() || this.getConfigPath();
+            const confServer = vscode.Uri.joinPath(userDir, 'odb-server.properties');
+            const confLogging = vscode.Uri.joinPath(userDir, 'odb-logging.properties');
+
+            if (fs.existsSync(confServer.fsPath)) {
+                files.push(confServer);
+            }
+
+            if (fs.existsSync(confLogging.fsPath)) {
+                files.push(confLogging);
+            }
+        }
+        return files;
+    }
+
+    public getDebugConfiguration(): null {
+        return null;
+    }
+
+    public async start(): Promise<void> {
+        let args: string[] = ["server"];
+        this.getUserFiles().forEach(f => {
+            switch (path.basename(f.fsPath)) {
+                case "odb-server.properties":
+                    args.push("-s", f.fsPath);
+                    break;
+
+                case "odb-logging.properties":
+                    args.push("-l", f.fsPath);
+                    break;
+            }
+        });
+
+        this._process = ProcessBuilder.exec(this.channel(), this.getName(), this.getCommand().fsPath, { shell: false }, ...args);
+        this.setStarted(true);
+        return new Promise<void>(() => { });
         // return new Promise<void>((resolve: () => void, reject: (e: Error) => void) => {
         //     p.on('error', (err: Error) => {
         //         reject(err);
@@ -245,13 +395,22 @@ export class ServerOQL extends Server {
         // });
     }
 
-    public async stop(outputChannel: vscode.OutputChannel): Promise<void> {
-        ProcessBuilder.exec(outputChannel, this.getName(), this.getCommand().fsPath, { shell: true }, '-t');
-        // if(this._process) {
-        //     this.setStarted(false);
-        //     this._process.kill();
-        // }
-        this.setStarted(false);
+    public async stop(): Promise<void> {
+        if(this._process) {
+             this.setStarted(false);
+             this._process.kill();
+             this._process = undefined;
+        }
         return new Promise<void>(() => { });
     }
+}
+
+export function newInstance(name: string, type: string, installPath: vscode.Uri, storagePath: vscode.Uri, userDir?: vscode.Uri): Server {
+    if (type === "cli") {
+        return new ServerCLI(name, installPath, storagePath, userDir);
+    }
+    if (type === "server") {
+        return new ServerOQL(name, installPath, storagePath, userDir);
+    }
+    return new ServerPlatform(name, installPath, storagePath, userDir);
 }

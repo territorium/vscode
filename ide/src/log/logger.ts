@@ -19,12 +19,12 @@ export abstract class LogServer {
 	constructor() {
 		this.enabled = false;
 		this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1);
-		this.statusBarItem.text = "Log Server: $(debug-start) ";
+		this.statusBarItem.text = "TOL Telemetry $(debug-start)";
 		this.updateStatusBarTooltip();
-		this.statusBarItem.command = "LogServer.start";
+		this.statusBarItem.command = "TolTelemetry.start";
 		this.statusBarItem.show();
 
-		this.outputChannel = vscode.window.createOutputChannel("Log Server", Defaults.LOG_FORMATTER);
+		this.outputChannel = vscode.window.createOutputChannel("TOL Telemetry", Defaults.LOG_FORMATTER);
 	}
 
 	public start() {
@@ -40,18 +40,19 @@ export abstract class LogServer {
 
 	public stop() {
 		this.enabled = false;
-		this.statusBarItem.text = "Log Server: $(debug-start) ";
+		this.statusBarItem.text = "TOL Telemetry $(debug-start)";
 		this.statusBarItem.tooltip = "Click the button to start monitoring the log.";
-		this.statusBarItem.command = "LogServer.start";
+		this.statusBarItem.command = "TolTelemetry.start";
 
-		vscode.window.showInformationMessage("The Log Server has stopped");
+		vscode.window.showInformationMessage("TOL Telemetry has stopped");
 		this.updateStatusBarTooltip();
 		this.disconnect();
+		this.releaseListeners();
 	}
 
 	public toggle() {
 		this.enabled = !this.enabled;
-		vscode.window.setStatusBarMessage(this.enabled ? 'Log server resumes' : 'Log server is paused', 2000);
+		vscode.window.setStatusBarMessage(this.enabled ? 'TOL Telemetry resumes' : 'TOL Telemetry is paused', 2000);
 	}
 
 	public clear() {
@@ -73,15 +74,22 @@ export abstract class LogServer {
 	}
 
 	protected abstract connect(port: number, host: string): any;
+	protected abstract releaseListeners(): any;
 	protected abstract disconnect(): any;
 
-	protected onConnected(message: string) {
-		vscode.window.showInformationMessage(message);
+	protected onConnected(address: any) {
+		vscode.window.showInformationMessage(`TOL Telemetry started ${JSON.stringify(address)}`);
 
 		this.enabled = true;
-		this.statusBarItem.command = "LogServer.stop";
-		this.statusBarItem.text = "Log Server: $(debug-stop)";
+		this.statusBarItem.command = "TolTelemetry.stop";
+		this.statusBarItem.text = "TOL Telemetry $(debug-stop)";
 		// this.statusBarItem.tooltip = `Click the button to stop monitoring the log.\nHost:${host} Port:${port}`;
+	}
+
+	protected onError(error: any) {
+		// Failed to monitor
+		vscode.window.showErrorMessage(`Failed to start the TOL Telemetry ${error.message}`);
+		this.releaseListeners();
 	}
 
 	protected onData(data: Buffer) {
@@ -97,7 +105,7 @@ export abstract class LogServer {
 			let proc = match.at(5);
 			let msgId = match.at(6);
 			let msg = match.at(8);
-			this.outputChannel.append([(timestamp?.substring(11, 23) || ""), severity, proc, appl, host, (msg + "\n")].join(" | "));
+			this.outputChannel.append([(timestamp?.substring(0, 23) || ""), severity, proc, appl, host, (msg + "\n")].join(" | "));
 		} else {
 			this.outputChannel.append(text);
 		}

@@ -2,7 +2,7 @@
 
 ## Usage
 
-![screencast](screencast.png))
+![screencast](screencast.png)
 
 ## Features
 * Add smart.IO Platform from Install Path

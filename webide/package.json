@@ -2,7 +2,7 @@
   "name": "tol-ide",
   "displayName": "TOL Dev Tools",
   "description": "TOL Development tools for VSCode Web",
-  "version": "0.0.2",
+  "version": "0.0.4",
   "publisher": "TOL",
   "icon": "logo.png",
   "repository": {
@@ -11,7 +11,7 @@
   },
   "license": "MIT",
   "engines": {
-    "vscode": "^1.89.0"
+    "vscode": "^1.94.0"
   },
   "categories": [
     "Other"
@@ -139,16 +139,16 @@
     "browser": "vscode-test-web --browserType=chromium --extensionDevelopmentPath=. ./test-data"
   },
   "devDependencies": {
-    "@types/vscode": "^1.90.0",
-    "@types/node": "^20.14.2",
-    "@typescript-eslint/eslint-plugin": "^7.12.0",
-    "@typescript-eslint/parser": "^7.12.0",
+    "@types/vscode": "^1.94.0",
+    "@types/node": "^22.7.8",
+    "@typescript-eslint/eslint-plugin": "^8.11.0",
+    "@typescript-eslint/parser": "^8.11.0",
     "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
-    "@vscode/test-web": "^0.0.54",
+    "@vscode/test-web": "^0.0.63",
     "@types/assert": "^1.5.10",
-    "typescript": "^5.4.5",
-    "esbuild": "^0.21.4",
-    "glob": "^10.4.1",
+    "typescript": "^5.6.3",
+    "esbuild": "^0.24.0",
+    "glob": "^11.0.0",
     "npm-run-all": "^4.1.5"
   },
   "dependencies": {

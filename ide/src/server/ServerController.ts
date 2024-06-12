@@ -15,10 +15,7 @@ import { Server } from "./Server";
 
 export class ServerController {
 
-    private _outputChannel: vscode.OutputChannel;
-
     constructor(private _model: ServerModel, private _context: vscode.ExtensionContext) {
-        this._outputChannel = vscode.window.createOutputChannel('vscode-tol', Defaults.LOG_FORMATTER);
     }
 
     async validateInstallPath(installPath: vscode.Uri): Promise<boolean> {
@@ -68,17 +65,23 @@ export class ServerController {
         if (server) {
             const pathPicker: vscode.Uri[] | undefined = await vscode.window.showOpenDialog({
                 defaultUri: vscode.workspace.rootPath ? vscode.Uri.file(vscode.workspace.rootPath) : undefined,
-                canSelectFiles: true,
-                canSelectFolders: false,
-                openLabel: "Select a Model",
-                filters: {
-                    'Configuration': ['properties']
-                }
+                openLabel: "Select a Project Folder",
+                canSelectFiles: false,
+                canSelectFolders: true
+                // filters: {
+                //     'Configuration': ['properties']
+                // }
             });
 
             if (pathPicker) {
-                this._model.setModelPath(server, vscode.Uri.parse(path.parse(pathPicker[0].fsPath).dir));
+                this._model.setModelPath(server, pathPicker[0]);
             }
+        }
+    }
+
+    public async removeModel(server: Server): Promise<void> {
+        if (server) {
+            this._model.setModelPath(server, undefined);
         }
     }
 
@@ -100,7 +103,7 @@ export class ServerController {
                 return;
             }
 
-            await server.stop(this._outputChannel);
+            await server.stop();
 
             if (restart) {
                 await this.startInternally(server, server.isDebugging());
@@ -166,7 +169,7 @@ export class ServerController {
                 //     }
             });
 
-            const process = server.start(this._outputChannel);
+            const process = server.start();
             server.setStarted(true);
 
             // START debugging
@@ -196,9 +199,9 @@ export class ServerController {
             if (element.isStarted()) {
                 this.stopOrRestartServer(element);
             }
-            this._outputChannel.dispose();
         });
         this._model.saveServerListSync();
+        this._model.dispose();
     }
 
     // public async runOrDebugOnServer(debug?: boolean, server?: ServerTreeItem): Promise<void> {
