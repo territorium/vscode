@@ -2,7 +2,7 @@
   "name": "tol-tools",
   "displayName": "TOL Server Tools",
   "description": "TOL server tools for VSCode",
-  "version": "0.2.2",
+  "version": "0.2.6",
   "publisher": "TOL",
   "icon": "logo.png",
   "repository": {
@@ -10,7 +10,7 @@
   },
   "license": "MIT",
   "engines": {
-    "vscode": "^1.89.0"
+    "vscode": "^1.22.0"
   },
   "categories": [
     "Other"
@@ -35,20 +35,24 @@
     },
     "commands": [
       {
-        "command": "LogServer.start",
-        "title": "Start Log Server"
+        "command": "TolTelemetry.start",
+        "title": "Start TOL Telemetry"
       },
       {
-        "command": "LogServer.stop",
-        "title": "Stop Log Server"
+        "command": "TolTelemetry.stop",
+        "title": "Stop TOL Telemetry"
       },
       {
-        "command": "LogServer.toggle",
-        "title": "Pause/Resume Log Server Listening"
+        "command": "TolTelemetry.toggle",
+        "title": "Pause/Resume TOL Telemetry Listening"
       },
       {
-        "command": "LogServer.clear",
-        "title": "Clear Log Server Output Channel"
+        "command": "TolTelemetry.clear",
+        "title": "Clear TOL Telemetry Output Channel"
+      },
+      {
+        "command": "chrome.debug",
+        "title": "Open JavaScript Debugger"
       },
       {
         "command": "tol.refreshServerView",
@@ -118,7 +122,11 @@
       },
       {
         "command": "server.model",
-        "title": "Select Model"
+        "title": "Choose Project"
+      },
+      {
+        "command": "server.model.remove",
+        "title": "Remove Project"
       },
       {
         "command": "tol.openServerFile",
@@ -187,6 +195,10 @@
           "when": "never"
         },
         {
+          "command": "server.model.remove",
+          "when": "never"
+        },
+        {
           "command": "tol.openServerFile",
           "when": "never"
         },
@@ -238,8 +250,12 @@
         },
         {
           "command": "server.model",
-          "when": "view == serverExplorer && viewItem == model",
+          "when": "view == serverExplorer && viewItem == idleserver",
           "group": "model@1"
+        },
+        {
+          "command": "server.model.remove",
+          "when": "view == serverExplorer && viewItem == model"
         }
       ]
     },
@@ -249,12 +265,12 @@
         "title": "TOL Tools",
         "order": 22,
         "properties": {
-          "LogServer.host": {
+          "TolTelemetry.host": {
             "type": "string",
             "default": "localhost",
             "description": "The host address of the server."
           },
-          "LogServer.port": {
+          "TolTelemetry.port": {
             "type": "number",
             "default": 7755,
             "description": "The UDP port the server listens on."
@@ -299,71 +315,114 @@
     ],
     "configurationDefaults": {
       "editor.tokenColorCustomizations": {
-        "textMateRules": [
-          {
-            "name": "syslog-proc",
-            "scope": "syslog-proc",
-            "settings": {
-              "foreground": "#555"
+        "[*Light*]": {
+          "textMateRules": [
+            {
+              "name": "Light fatal level",
+              "scope": "tol.level.fatal",
+              "settings": {
+                "fontStyle": "bold",
+                "foreground": "#800000"
+              }
+            },
+            {
+              "name": "Light error level",
+              "scope": "tol.level.error",
+              "settings": {
+                "foreground": "#a00"
+              }
+            },
+            {
+              "name": "Light warning level",
+              "scope": "tol.level.warn",
+              "settings": {
+                "foreground": "#990"
+              }
+            },
+            {
+              "name": "Light information level",
+              "scope": "tol.level.info",
+              "settings": {
+                "foreground": "#00a"
+              }
+            },
+            {
+              "name": "Light config level",
+              "scope": "tol.level.config",
+              "settings": {
+                "foreground": "#333"
+              }
+            },
+            {
+              "name": "Light debug level",
+              "scope": "tol.level.debug",
+              "settings": {
+                "foreground": "#777"
+              }
+            },
+            {
+              "name": "Light trace level",
+              "scope": "tol.level.trace",
+              "settings": {
+                "foreground": "#aaa"
+              }
             }
-          },
-          {
-            "name": "syslog-level.FATAL",
-            "scope": "syslog-level.FATAL",
-            "settings": {
-              "fontStyle": "bold",
-              "foreground": "#a00"
+          ]
+        },
+        "[*Dark*]": {
+          "textMateRules": [
+            {
+              "name": "Dark fatal level",
+              "scope": "tol.level.fatal",
+              "settings": {
+                "fontStyle": "bold",
+                "foreground": "#f00"
+              }
+            },
+            {
+              "name": "Dark error level",
+              "scope": "tol.level.error",
+              "settings": {
+                "foreground": "#f55"
+              }
+            },
+            {
+              "name": "Dark warning level",
+              "scope": "tol.level.warn",
+              "settings": {
+                "foreground": "#ff5"
+              }
+            },
+            {
+              "name": "Dark information level",
+              "scope": "tol.level.info",
+              "settings": {
+                "foreground": "#88f"
+              }
+            },
+            {
+              "name": "Dark config level",
+              "scope": "tol.level.config",
+              "settings": {
+                "foreground": "#777"
+              }
+            },
+            {
+              "name": "Dark debug level",
+              "scope": "tol.level.debug",
+              "settings": {
+                "foreground": "#888"
+              }
+            },
+            {
+              "name": "Dark trace level",
+              "scope": "tol.level.trace",
+              "settings": {
+                "foreground": "#aaa"
+              }
             }
-          },
-          {
-            "name": "syslog-level.ERROR",
-            "scope": "syslog-level.ERROR",
-            "settings": {
-              "fontStyle": "bold",
-              "foreground": "#a00"
-            }
-          },
-          {
-            "name": "syslog-level.WARN",
-            "scope": "syslog-level.WARN",
-            "settings": {
-              "fontStyle": "bold",
-              "foreground": "#bb0"
-            }
-          },
-          {
-            "name": "syslog-level.INFO",
-            "scope": "syslog-level.INFO",
-            "settings": {
-              "fontStyle": "bold",
-              "foreground": "#55f"
-            }
-          },
-          {
-            "name": "syslog-level.CONFIG",
-            "scope": "syslog-level.CONFIG",
-            "settings": {
-              "fontStyle": "bold underline",
-              "foreground": "#55f"
-            }
-          },
-          {
-            "name": "syslog-level.DEBUG",
-            "scope": "syslog-level.SUCCESS",
-            "settings": {
-              "fontStyle": "bold",
-              "foreground": "#000"
-            }
-          },
-          {
-            "name": "syslog-level.TRACE",
-            "scope": "syslog-level.TRACE",
-            "settings": {
-              "fontStyle": "bold",
-              "foreground": "#000"
-            }
-          }
-        ]
+          ]
+        }
       }
     },
     "languages": [
@@ -382,28 +441,25 @@
       {
         "language": "SYSLOG",
         "scopeName": "source.output",
-        "path": "./log.tmlanguage.json"
+        "path": "./text-mate-rules.json"
       }
     ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile && npm run lint",
-    "lint": "eslint src --ext ts",
-    "test": "vscode-test"
+    "vscode:prepublish": "npm run package",
+    "compile": "node ./esbuild.js",
+    "package": "NODE_ENV=production node ./esbuild.js",
+    "watch": "node ./esbuild.js --watch",
+    "lint": "eslint src --ext ts"
   },
   "devDependencies": {
-    "@types/vscode": "^1.90.0",
-    "@types/node": "^20.14.2",
-    "@typescript-eslint/eslint-plugin": "^7.13.0",
-    "@typescript-eslint/parser": "^7.13.0",
-    "@types/mocha": "^10.0.6",
     "@types/fs-extra": "^11.0.4",
-    "@vscode/test-cli": "^0.0.9",
-    "@vscode/test-electron": "^2.4.0",
-    "typescript": "^5.4.5"
+    "@types/node": "^22.7.8",
+    "@types/vscode": "^1.94.0",
+    "@typescript-eslint/eslint-plugin": "^8.11.0",
+    "@typescript-eslint/parser": "^8.11.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.3"
   },
   "dependencies": {
     "fs-extra": "^11.2.0"

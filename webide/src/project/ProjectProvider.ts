@@ -5,7 +5,7 @@ import * as vscode from "vscode";
 import { TreeItem } from "vscode";
 
 import { ProjectModel } from "./ProjectModel";
-import { ProjectNode, FileTreeItem } from "./Project";
+import { ProjectNode, FileTreeItem, ElementType } from "./Project";
 import { Utility } from "../util/Utility";
 
 
@@ -36,23 +36,23 @@ export class ProjectProvider implements vscode.TreeDataProvider<ProjectNode> {
 
     public async getTreeItem(element: ProjectNode): Promise<ProjectTreeItem> {
         const item = new ProjectTreeItem(element);
-        item.contextValue = element.getType();
+        item.contextValue = element.getType().toString();
         item.collapsibleState = (await element.getChildren()).length === 0 ? vscode.TreeItemCollapsibleState.None : vscode.TreeItemCollapsibleState.Collapsed;
 
         switch (element.getType()) {
-            case "project":
-                item.iconPath = Utility.toIconPath('symbol-method.svg', this._context);
+            case ElementType.PROJECT:
+                item.iconPath = Utility.toIconPath('package.svg', this._context);
                 break;
 
-            case "model":
+            case ElementType.MODEL:
                 item.iconPath = Utility.toIconPath('archive.svg', this._context);
                 break;
 
-            case "folder":
+            case ElementType.FOLDER:
                 item.iconPath = Utility.toIconPath('folder.svg', this._context);
                 break;
 
-            case "file":
+            case ElementType.FILE:
                 const title: string = item.label?.toString() ?? "";
                 item.command = { command: 'tol.openProjectFile', title: title, arguments: [element] };
 
