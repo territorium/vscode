@@ -6,4 +6,6 @@ export namespace Defaults {
 
 	export const TYPE_INI: string = 'INI';
 	export const TYPE_JVM: string = 'JVM';
+
+	export const OUT_DIR: string = 'dist';
 }
