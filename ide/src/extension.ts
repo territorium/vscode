@@ -6,7 +6,7 @@ import { ServerModel } from "./server/ServerModel";
 import { ServerController } from "./server/ServerController";
 import { ServerTreeProvider, ServerTreeItem } from "./server/ServerTreeProvider";
 
-
+import { ComponentGalleryPanel } from "./panels/ComponentGalleryPanel";
 
 import { LogServer } from './log/logger';
 import { UdpLogServer } from './log/logger_udp';
@@ -58,4 +58,13 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 		}
 	});
+
+
+	// Create the show gallery command
+	const showGalleryCommand = vscode.commands.registerCommand("component-gallery.showGallery", () => {
+		ComponentGalleryPanel.render(context.extensionUri);
+	});
+
+	// Add command to the extension context
+	context.subscriptions.push(showGalleryCommand);
 }

@@ -35,6 +35,10 @@
     },
     "commands": [
       {
+        "command": "component-gallery.showGallery",
+        "title": "Component Gallery: Show"
+      },
+      {
         "command": "TolTelemetry.start",
         "title": "Start TOL Telemetry"
       },
@@ -454,14 +458,19 @@
   },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
+    "@types/glob": "^8.1.0",
     "@types/node": "^22.7.8",
     "@types/vscode": "^1.94.0",
+    "@types/vscode-webview": "^1.57.5",
     "@typescript-eslint/eslint-plugin": "^8.11.0",
     "@typescript-eslint/parser": "^8.11.0",
-    "esbuild": "^0.24.0",
+    "esbuild-plugin-copy": "^2.1.1",
+    "glob": "^11.0.0",
+    "prettier": "^3.3.3",
     "typescript": "^5.6.3"
   },
   "dependencies": {
-    "fs-extra": "^11.2.0"
+    "fs-extra": "^11.2.0",
+    "@vscode/webview-ui-toolkit": "^1.4.0"
   }
 }

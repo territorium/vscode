@@ -1,4 +1,5 @@
 const { build } = require("esbuild");
+const { copy } = require("esbuild-plugin-copy");
 
 //@ts-check
 /** @typedef {import('esbuild').BuildOptions} BuildOptions **/
@@ -20,6 +21,26 @@ const extensionConfig = {
   entryPoints: ["./src/extension.ts"],
   outfile: "./dist/extension.js",
   external: ["vscode"],
+};
+
+// Config for webview source code (to be run in a web-based context)
+/** @type BuildOptions */
+const webviewConfig = {
+  ...baseConfig,
+  target: "es2020",
+  format: "esm",
+  entryPoints: ["./src/webview/main.ts"],
+  outfile: "./dist/webview.js",
+  plugins: [
+    // Copy webview css and ttf files to `out` directory unaltered
+    copy({
+      resolveFrom: "cwd",
+      assets: {
+        from: ["./src/webview/*.css", "./src/webview/*.ttf"],
+        to: ["./dist"],
+      },
+    }),
+  ],
 };
 
 // This watch config adheres to the conventions of the esbuild-problem-matchers
@@ -54,6 +75,7 @@ const watchConfig = {
         ...watchConfig,
       });
       await build({
+        ...webviewConfig,
         ...watchConfig,
       });
       console.log("[watch] build finished");
