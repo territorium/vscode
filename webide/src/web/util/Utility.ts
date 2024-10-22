@@ -9,7 +9,10 @@ export namespace Utility {
         vscode.window.showTextDocument(uri, { preview: false });
     }
 
-    export function toIconPath(file: string, context: vscode.ExtensionContext): { light: vscode.Uri; dark: vscode.Uri; } {
+    export function toIconPath(file: string, context: vscode.ExtensionContext): {
+        light: vscode.Uri;
+        dark: vscode.Uri;
+    } {
         return {
             dark: vscode.Uri.joinPath(context.extensionUri, 'icons', 'dark', file),
             light: vscode.Uri.joinPath(context.extensionUri, 'icons', 'light', file)

@@ -2,7 +2,7 @@
 
 ## Usage
 
-\!\[screencast\]\(screencast.png\)
+![screencast](https://github.com/territorium/vscode/blob/main/ide/screencast.png)
 
 ## Features
 * Add smart.IO Platform from Install Path

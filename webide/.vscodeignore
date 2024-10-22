@@ -1,13 +1,14 @@
 .vscode/**
-.vscode-test/**
 .vscode-test-web/**
 src/**
+out/**
 node_modules/**
 .gitignore
-esbuild.js
 .yarnrc
+webpack.config.js
+esbuild.js
 **/tsconfig.json
-**/.eslintrc.json
+**/eslint.config.mjs
 **/*.map
 **/*.ts
 **/.vscode-test.*

@@ -2,7 +2,7 @@
 
 ## Usage
 
-![screencast](screencast.png)
+![screencast](https://github.com/territorium/vscode/blob/main/webide/screencast.png)
 
 ## Features
 * Add smart.IO Platform from Install Path
@@ -13,7 +13,6 @@
 * Open application project in browser
 * Stop smart.IO Platform
 * Remove smart.IO Platform
-* Customize JVM Options when starting smart.IO Platform
 
 ## Prerequisites
 * smart.IO Platform Installation

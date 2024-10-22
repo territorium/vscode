@@ -1,9 +1,11 @@
-const esbuild = require("esbuild");
+const esbuild = require('esbuild');
 
 const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
 
 /**
+ * This plugin hooks into the build process to print errors in a format that the problem matcher in
+ * Visual Studio Code can understand.
  * @type {import('esbuild').Plugin}
  */
 const esbuildProblemMatcherPlugin = {
