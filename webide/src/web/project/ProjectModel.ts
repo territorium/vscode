@@ -2,6 +2,7 @@
 
 import * as vscode from "vscode";
 import { Project } from "./Project";
+import path from "path";
 
 export class ProjectModel {
 
@@ -15,8 +16,15 @@ export class ProjectModel {
     }
 
     public async scan(): Promise<void> {
-        this._items = vscode.workspace.workspaceFolders?.filter((f: vscode.WorkspaceFolder): boolean => Project.isValid(f)).map(f => new Project(f)) ?? [];
-        
+        this._items = [];
+        let paths = vscode.workspace.workspaceFolders?.map(f => f) ?? [];
+
+        await vscode.workspace.findFiles("{context.properties,smartIO/context.properties}").then((uris: vscode.Uri[]) => {
+            uris.forEach(uri =>
+                paths.filter(p => uri.path.startsWith(p.uri.path)).forEach(p => this._items.push(new Project(p)))
+            );
+        });
+
         vscode.commands.executeCommand('tol.refreshProjectView');
     }
 

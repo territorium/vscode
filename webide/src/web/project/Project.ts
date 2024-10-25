@@ -59,12 +59,6 @@ export class Project extends ProjectNode {
         const list = config.keys().filter(k => k.startsWith("model.")) ?? [];
         return list.map(k => new ModelTreeItem(k.substring(6), this.uri, config.get(k))) ?? [];
     }
-
-    public static isValid(folder: vscode.WorkspaceFolder): boolean {
-        const p1 = path.join(folder.uri.path, "context.properties");
-        const p2 = path.join(folder.uri.path, "smartIO", "context.properties");
-        return true;//fs.existsSync(p1) || fs.existsSync(p2);
-    }
 }
 
 
